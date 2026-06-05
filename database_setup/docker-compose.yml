@@ -1,0 +1,57 @@
+version: "3.9"
+
+# Database and Redis services only
+# No backend application logic
+# No Python code
+
+services:
+  # PostgreSQL Database with pgvector extension
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: finedu_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: finedu_admin
+      POSTGRES_PASSWORD: finedu_admin_password
+      POSTGRES_DB: postgres
+    ports:
+      - "55432:5432"
+    volumes:
+      # Mount init scripts for database/table creation
+      - ./db/init:/docker-entrypoint-initdb.d
+      # Persist database data
+      - finedu_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finedu_admin -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - finedu_network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: finedu_redis
+    restart: unless-stopped
+    ports:
+      - "56379:6379"
+    volumes:
+      - finedu_redis_data:/data
+    command: redis-server --requirepass finedu_redis_password --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - finedu_network
+
+volumes:
+  finedu_pg_data:
+  finedu_redis_data:
+
+networks:
+  finedu_network:
+    driver: bridge
+

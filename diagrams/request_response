@@ -1,0 +1,55 @@
+sequenceDiagram
+    autonumber
+
+    participant U as User
+    participant F as React PWA
+    participant G as Nginx Gateway
+    participant BS as Budget Service
+    participant DS as Debt Service
+    participant AIS as AI Agent Service
+    participant PG as PostgreSQL
+    participant AO as Azure OpenAI
+
+    rect rgb(230,250,230)
+    Note over U,PG: Flow 1: Expense Entry
+    U->>F: Enter expense ₹500 Food
+    F->>F: Validate input
+    F->>G: POST /expenses (with JWT)
+    G->>G: Verify JWT + Rate limit
+    G->>BS: Forward request
+    BS->>PG: INSERT expense
+    BS->>PG: UPDATE budgets
+    BS-->>G: 201 Created
+    G-->>F: Success response
+    F-->>U: Show updated dashboard
+    end
+
+    rect rgb(230,240,255)
+    Note over U,AO: Flow 2: AI Question
+    U->>F: Ask: How can I save more?
+    F->>G: POST /agents/chat
+    G->>AIS: Forward question
+    AIS->>PG: Fetch user expenses + budgets
+    AIS->>PG: Query financial_concepts (pgvector)
+    AIS->>AO: Send prompt with context
+    AO-->>AIS: LLM response
+    AIS->>PG: Log interaction
+    AIS-->>G: Formatted answer
+    G-->>F: JSON response
+    F-->>U: Display AI answer
+    end
+
+    rect rgb(255,245,230)
+    Note over U,PG: Flow 3: Weekly Report
+    U->>F: Click Generate Weekly Report
+    F->>G: GET /agents/reports/weekly
+    G->>AIS: Forward request
+    AIS->>BS: MCP call: analyze_spending
+    BS-->>AIS: Spending analysis
+    AIS->>DS: MCP call: calculate_payoff_plan
+    DS-->>AIS: Debt analysis
+    AIS->>PG: Store report
+    AIS-->>G: Report JSON
+    G-->>F: Report data
+    F-->>U: Render report view
+    end

@@ -1,0 +1,204 @@
+---
+# PgBouncer Deployment — connection pooler for PostgreSQL
+# Sits between the backend pods and the PostgreSQL instances.
+#
+# Connection flow:
+#   Backend pods → PgBouncer:5432 → PostgreSQL:5432
+#
+# Why transaction-mode pooling:
+#   - FastAPI (async, stateless) never uses session-level state across requests.
+#   - Transaction mode returns the DB connection to the pool after each transaction.
+#   - Allows 5000 app connections to share ~100 PostgreSQL connections.
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pgbouncer-config
+  namespace: financialedapp
+data:
+  pgbouncer.ini: |
+    [databases]
+    auth_db = host=postgres-auth port=5432 dbname=auth_db pool_size=50 pool_mode=transaction
+    data_db = host=postgres-data port=5432 dbname=data_db pool_size=80 pool_mode=transaction
+
+    [pgbouncer]
+    listen_addr = *
+    listen_port = 5432
+    auth_type = scram-sha-256
+    auth_file = /etc/pgbouncer/userlist.txt
+    max_client_conn = 5000
+    default_pool_size = 50
+    reserve_pool_size = 20
+    reserve_pool_timeout = 3
+    min_pool_size = 10
+    pool_mode = transaction
+    server_connect_timeout = 15
+    server_idle_timeout = 600
+    client_idle_timeout = 300
+    query_wait_timeout = 30
+    server_lifetime = 3600
+    cancel_wait_timeout = 10
+    log_connections = 0
+    log_disconnections = 0
+    log_pooler_errors = 1
+    stats_period = 60
+    server_check_delay = 30
+    server_check_query = SELECT 1
+    tcp_keepalive = 1
+    tcp_keepidle = 10
+    tcp_keepintvl = 10
+    tcp_keepcnt = 3
+    admin_users = pgbouncer_admin
+    stats_users = pgbouncer_stats
+
+---
+# PgBouncer Service — backend pods connect to this
+apiVersion: v1
+kind: Service
+metadata:
+  name: pgbouncer
+  namespace: financialedapp
+  labels:
+    app: pgbouncer
+    tier: data
+spec:
+  selector:
+    app: pgbouncer
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+      protocol: TCP
+  type: ClusterIP
+
+---
+# PgBouncer Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pgbouncer
+  namespace: financialedapp
+  labels:
+    app: pgbouncer
+    tier: data
+spec:
+  replicas: 2    # 2 replicas for HA; PgBouncer is stateless
+  selector:
+    matchLabels:
+      app: pgbouncer
+  template:
+    metadata:
+      labels:
+        app: pgbouncer
+        tier: data
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 70     # pgbouncer user in the image
+        fsGroup: 70
+
+      containers:
+      - name: pgbouncer
+        image: bitnami/pgbouncer:1.22.1
+        imagePullPolicy: IfNotPresent
+
+        ports:
+        - containerPort: 5432
+          name: postgres
+
+        env:
+        - name: PGBOUNCER_DATABASE
+          value: "auth_db data_db"
+        - name: POSTGRESQL_HOST
+          value: "postgres-auth"
+        - name: POSTGRESQL_PORT
+          value: "5432"
+        - name: PGBOUNCER_POOL_MODE
+          value: "transaction"
+        - name: PGBOUNCER_MAX_CLIENT_CONN
+          value: "5000"
+        - name: PGBOUNCER_DEFAULT_POOL_SIZE
+          value: "50"
+        - name: PGBOUNCER_MIN_POOL_SIZE
+          value: "10"
+        - name: PGBOUNCER_RESERVE_POOL_SIZE
+          value: "20"
+        - name: PGBOUNCER_SERVER_IDLE_TIMEOUT
+          value: "600"
+        - name: POSTGRESQL_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: backend-secrets
+              key: AUTH_DB_USER
+        - name: POSTGRESQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: backend-secrets
+              key: AUTH_DB_PASSWORD
+
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          capabilities:
+            drop: [ALL]
+
+        # Health checks
+        livenessProbe:
+          tcpSocket:
+            port: 5432
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+        readinessProbe:
+          tcpSocket:
+            port: 5432
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+
+        volumeMounts:
+        - name: pgbouncer-config
+          mountPath: /bitnami/pgbouncer/conf
+          readOnly: true
+
+      volumes:
+      - name: pgbouncer-config
+        configMap:
+          name: pgbouncer-config
+
+      # Run PgBouncer on the same node as PostgreSQL for lower latency
+      affinity:
+        podAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 80
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values: [postgres]
+              topologyKey: kubernetes.io/hostname
+
+---
+# PodDisruptionBudget — ensure at least 1 PgBouncer pod always running
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: pgbouncer-pdb
+  namespace: financialedapp
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: pgbouncer

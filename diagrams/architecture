@@ -1,0 +1,83 @@
+flowchart TB
+    %% Client & Gateway
+    subgraph Client_Layer["Client Layer"]
+        A[React PWA - Web + Mobile]
+    end
+
+    subgraph Gateway_Layer["API Gateway"]
+        G[Nginx: TLS, JWT, Rate Limiting, CORS]
+    end
+
+    A -->|HTTPS JSON| G
+
+    %% Microservices
+    subgraph Microservices_Layer["Microservices - FastAPI"]
+        AS[Auth Service :8001<br/>register, login, refresh, consent]
+        US[User Service :8002<br/>profile, data export, data delete]
+        BS[Budget Service :8003<br/>expenses, budgets, analytics]
+        DS[Debt Service :8004<br/>loans, payoff plans, projections]
+        AIS[AI Agent Service :8005<br/>chat, reports, MCP orchestrator]
+        NS[Notification Service :8006<br/>email, push, SMS]
+    end
+
+    G --> AS
+    G --> US
+    G --> BS
+    G --> DS
+    G --> AIS
+    G --> NS
+
+    %% Data Layer
+    subgraph Data_Layer["Data Layer"]
+        PG[(PostgreSQL 16<br/>users, expenses, loans,<br/>budgets, ai_reports)]
+        RD[(Redis 7<br/>Cache + Sessions)]
+    end
+
+    AS --> PG
+    US --> PG
+    BS --> PG
+    DS --> PG
+    AIS --> PG
+    AS --> RD
+    BS --> RD
+    DS --> RD
+    AIS --> RD
+
+    %% External AI
+    subgraph External_Services["External Services"]
+        AO[Azure OpenAI<br/>gpt-4, gpt-3.5]
+    end
+
+    AIS -->|LLM calls| AO
+
+    %% AI Agents
+    subgraph Agents["AI Agents - MCP Protocol"]
+        BA[Budget Analyzer Agent]
+        DO[Debt Optimizer Agent]
+        EA[Education Agent + RAG]
+        RA[Report Generator]
+    end
+
+    AIS --> BA
+    AIS --> DO
+    AIS --> EA
+    AIS --> RA
+    BA --> PG
+    DO --> PG
+    EA --> PG
+    RA --> PG
+
+    %% Service to Service
+    DS -.->|payment reminders| NS
+    BS -.->|overspending alerts| NS
+
+    %% Styling
+    classDef serviceStyle fill:#3b82f6,stroke:#1e40af,stroke-width:2px,color:#fff
+    classDef dataStyle fill:#10b981,stroke:#059669,stroke-width:2px,color:#fff
+    classDef agentStyle fill:#f59e0b,stroke:#d97706,stroke-width:2px,color:#fff
+    classDef externalStyle fill:#8b5cf6,stroke:#7c3aed,stroke-width:2px,color:#fff
+
+    class AS,US,BS,DS,AIS,NS serviceStyle
+    class PG,RD dataStyle
+    class BA,DO,EA,RA agentStyle
+    class AO externalStyle

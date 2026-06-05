@@ -1,0 +1,220 @@
+name: CI - Backend Tests & Coverage
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres-auth:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: auth_db
+          POSTGRES_USER: auth_user
+          POSTGRES_PASSWORD: auth_password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      postgres-data:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: data_db
+          POSTGRES_USER: data_user
+          POSTGRES_PASSWORD: data_password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5433:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        working-directory: ./backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio pytest-cov
+
+      - name: Setup environment variables
+        run: |
+          cat > backend/.env.test << EOF
+          ENVIRONMENT=testing
+          DEBUG=false
+          APP_NAME=FinancialEdApp
+          APP_VERSION=1.0.0
+          
+          # Auth DB
+          AUTH_DB_HOST=localhost
+          AUTH_DB_PORT=5432
+          AUTH_DB_NAME=auth_db
+          AUTH_DB_USER=auth_user
+          AUTH_DB_PASSWORD=auth_password
+          
+          # Data DB
+          DATA_DB_HOST=localhost
+          DATA_DB_PORT=5433
+          DATA_DB_NAME=data_db
+          DATA_DB_USER=data_user
+          DATA_DB_PASSWORD=data_password
+          
+          # Redis
+          REDIS_URL=redis://localhost:6379/0
+          
+          # JWT
+          JWT_SECRET_KEY=test-secret-key-do-not-use-in-production
+          ACCESS_TOKEN_EXPIRE_MINUTES=30
+          REFRESH_TOKEN_EXPIRE_DAYS=7
+          
+          # CORS
+          ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
+          
+          # Rate Limiting
+          RATE_LIMIT_LOGIN_LIMIT=5
+          RATE_LIMIT_LOGIN_WINDOW=60
+          RATE_LIMIT_REGISTER_LIMIT=3
+          RATE_LIMIT_REGISTER_WINDOW=60
+          
+          # Email
+          SMTP_HOST=smtp.gmail.com
+          SMTP_PORT=587
+          SMTP_USER=test@example.com
+          SMTP_PASSWORD=test_password
+          SMTP_FROM_EMAIL=noreply@financialedapp.com
+          
+          # Feature flags
+          PGBOUNCER_MODE=false
+          EOF
+
+      - name: Run linting (Flake8)
+        working-directory: ./backend
+        run: |
+          pip install flake8
+          flake8 app/ --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 app/ --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
+        continue-on-error: true
+
+      - name: Run security scan (Bandit)
+        working-directory: ./backend
+        run: |
+          pip install bandit
+          bandit -r app/ -ll --exit-zero
+        continue-on-error: true
+
+      - name: Run unit tests with coverage
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgresql://auth_user:auth_password@localhost:5432/auth_db
+        run: |
+          pytest tests/ \
+            --cov=app \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            --cov-report=html \
+            --junitxml=test-results.xml \
+            -v
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./backend/coverage.xml
+          flags: backend
+          name: backend-coverage
+          fail_ci_if_error: false
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results
+          path: backend/test-results.xml
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report
+          path: backend/htmlcov
+
+      - name: Comment PR with coverage
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const coverage = fs.readFileSync('backend/coverage.xml', 'utf8');
+            // Parse coverage and comment on PR
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '✅ **Backend Test Run Complete**\n\nCheck artifacts for coverage report'
+            });
+
+      - name: Fail if coverage too low
+        working-directory: ./backend
+        run: |
+          python - <<'EOF'
+          import xml.etree.ElementTree as ET, sys
+          tree = ET.parse("coverage.xml")
+          root = tree.getroot()
+          line_rate = float(root.attrib.get("line-rate", "0"))
+          pct = round(line_rate * 100, 1)
+          print(f"Coverage: {pct}%")
+          threshold = 70
+          if pct < threshold:
+              print(f"FAIL: coverage {pct}% is below minimum {threshold}%", file=sys.stderr)
+              sys.exit(1)
+          print(f"OK: coverage {pct}% meets minimum {threshold}%")
+          EOF
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        working-directory: ./backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install pylint black isort
+      - name: Check code formatting with Black
+        working-directory: ./backend
+        run: black app/ --check
+        continue-on-error: true
+      - name: Check import sorting with isort
+        working-directory: ./backend
+        run: isort app/ --check-only
+        continue-on-error: true

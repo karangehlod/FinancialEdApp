@@ -1,0 +1,116 @@
+erDiagram
+    USERS {
+        UUID id PK
+        VARCHAR_255 email UK
+        VARCHAR_255 password_hash
+        VARCHAR_255 name
+        VARCHAR_2 country
+        VARCHAR_3 currency
+        VARCHAR_20 knowledge_level
+        VARCHAR_20 risk_tolerance
+        BOOLEAN consent_given
+        TIMESTAMP consent_timestamp
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+    }
+
+    EXPENSES {
+        UUID id PK
+        UUID user_id FK
+        DECIMAL_15_2 amount
+        VARCHAR_50 category
+        VARCHAR_50 subcategory
+        TEXT description
+        DATE date
+        VARCHAR_255 merchant
+        VARCHAR_50 payment_method
+        BOOLEAN is_recurring
+        TIMESTAMP created_at
+    }
+
+    LOANS {
+        UUID id PK
+        UUID user_id FK
+        VARCHAR_20 loan_type
+        VARCHAR_255 lender
+        DECIMAL_15_2 principal
+        DECIMAL_5_2 interest_rate
+        INT tenure_months
+        DECIMAL_15_2 emi_amount
+        DECIMAL_15_2 outstanding_balance
+        DATE start_date
+        DATE maturity_date
+        TIMESTAMP created_at
+    }
+
+    LOAN_PAYMENTS {
+        UUID id PK
+        UUID loan_id FK
+        DATE payment_date
+        DECIMAL_15_2 principal_paid
+        DECIMAL_15_2 interest_paid
+        DECIMAL_15_2 extra_payment
+        DECIMAL_15_2 outstanding_after_payment
+    }
+
+    BUDGETS {
+        UUID id PK
+        UUID user_id FK
+        DATE month
+        VARCHAR_50 category
+        DECIMAL_15_2 allocated_amount
+        DECIMAL_15_2 spent_amount
+        DECIMAL_15_2 recommended_amount
+        TIMESTAMP created_at
+    }
+
+    LEARNING_PROGRESS {
+        UUID id PK
+        UUID user_id FK
+        VARCHAR_100 topic
+        VARCHAR_255 concept
+        INT mastery_level
+        TIMESTAMP last_practiced
+        JSONB quiz_scores
+    }
+
+    FINANCIAL_CONCEPTS {
+        UUID id PK
+        VARCHAR_255 concept_name
+        VARCHAR_50 category
+        VARCHAR_20 difficulty_level
+        TEXT content
+        VECTOR_1536 embedding
+        JSONB examples
+        UUID_ARRAY related_concepts
+        TIMESTAMP created_at
+    }
+
+    AI_REPORTS {
+        UUID id PK
+        UUID user_id FK
+        VARCHAR_20 report_type
+        JSONB report_content
+        TEXT_ARRAY insights
+        TEXT_ARRAY recommendations
+        TIMESTAMP generated_at
+    }
+
+    AGENT_INTERACTIONS {
+        UUID id PK
+        UUID user_id FK
+        VARCHAR_50 agent_name
+        VARCHAR_100 agent_action
+        JSONB request_payload
+        JSONB response_payload
+        INT execution_time_ms
+        TIMESTAMP timestamp
+    }
+
+    USERS ||--o{ EXPENSES : "has"
+    USERS ||--o{ LOANS : "has"
+    USERS ||--o{ BUDGETS : "has"
+    USERS ||--o{ LEARNING_PROGRESS : "has"
+    USERS ||--o{ AI_REPORTS : "has"
+    USERS ||--o{ AGENT_INTERACTIONS : "has"
+    LOANS ||--o{ LOAN_PAYMENTS : "has"

@@ -1,0 +1,120 @@
+[tool.pytest.ini_options]
+# Pytest configuration for comprehensive testing
+
+# Test discovery
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*", "*Test"]
+python_functions = ["test_*"]
+
+# Minimum version
+minversion = "7.0"
+
+# Add options
+addopts = [
+    # Verbose output
+    "-v",
+    # Show local variables in tracebacks
+    "--tb=short",
+    # Capture stdout/stderr - disable for better async handling
+    "--capture=no",
+    # Coverage reporting
+    "--cov=app",
+    "--cov-report=html:htmlcov",
+    "--cov-report=term-missing",
+    "--cov-report=xml",
+    # Coverage thresholds
+    "--cov-fail-under=80",
+    # Warnings - enable for debugging
+    "-W ignore::DeprecationWarning",
+    "-W ignore::PendingDeprecationWarning",
+    # Markers
+    "--strict-markers",
+    # Asyncio mode
+    "--asyncio-mode=auto",
+    # Exit after first failure for faster debugging
+    # "--maxfail=1",
+]
+
+# Markers
+markers = [
+    "unit: Unit tests for individual components",
+    "integration: Integration tests across modules", 
+    "api: API endpoint tests",
+    "edge_case: Edge case and error scenario tests",
+    "performance: Performance and load tests",
+    "auth: Authentication and authorization tests",
+    "cleanup: Tests with resource cleanup requirements",
+    "slow: Tests that take longer to run",
+    "database: Tests that require database access",
+    "external: Tests that require external services",
+]
+
+# Test timeout - reduce for faster feedback
+timeout = 60  # 1 minute per test
+
+# Asyncio configuration
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+
+# Logging
+log_cli = true
+log_cli_level = "INFO"
+log_cli_format = "%(asctime)s [%(levelname)8s] [%(name)s] %(message)s"
+log_cli_date_format = "%Y-%m-%d %H:%M:%S"
+
+# Filter warnings
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+    "ignore::pytest.PytestUnraisableExceptionWarning",
+    "ignore::RuntimeWarning",
+    "ignore:.*unclosed.*:ResourceWarning",
+]
+
+# Paths
+norecursedirs = [".git", ".tox", "dist", "build", "*.egg", "venv", ".venv"]
+
+[tool.coverage.run]
+# Coverage configuration
+source = ["app"]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "*/__pycache__/*",
+    "*/migrations/*",
+    "*/venv/*",
+    "*/.venv/*",
+    "*/site-packages/*",
+    "*/conftest.py",
+    "*/setup.py",
+    "*/.git/*",
+]
+
+branch = true
+parallel = true
+
+[tool.coverage.report]
+# Coverage reporting
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+
+ignore_errors = true
+show_missing = true
+precision = 2
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+[tool.coverage.xml]
+output = "coverage.xml"

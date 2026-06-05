@@ -1,0 +1,368 @@
+version: '3.8'
+
+# =============================================================================
+# FinancialEdApp — Docker Compose
+# =============================================================================
+# All credentials and tunables are read from the .env file.
+# Copy .env.example to .env and fill in values before running.
+#
+# Usage:
+#   docker compose --env-file .env up --build
+#
+# Services:
+#   postgres_auth  — Auth DB  (users, tokens, OAuth accounts)
+#   postgres_data  — Data DB  (expenses, budgets, goals, loans …)
+#   redis          — Cache + rate-limit store + pub/sub
+#   backend        — FastAPI application
+#   frontend       — React / Vite application
+# =============================================================================
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Auth PostgreSQL (users, refresh_tokens, oauth_accounts)
+  # ---------------------------------------------------------------------------
+  postgres_auth:
+    image: pgvector/pgvector:pg16
+    container_name: financialedapp-auth-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${AUTH_DB_NAME}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=en_US.UTF-8"
+    volumes:
+      - postgres_auth_data:/var/lib/postgresql/data
+      - ./database_setup/db/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "${AUTH_DB_EXPOSED_PORT:-55432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${AUTH_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - financialedapp-network
+    logging: *default-logging
+
+  # ---------------------------------------------------------------------------
+  # Data PostgreSQL (expenses, budgets, goals, loans …)
+  # ---------------------------------------------------------------------------
+  postgres_data:
+    image: pgvector/pgvector:pg16
+    container_name: financialedapp-data-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${DATA_DB_NAME}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=en_US.UTF-8"
+    volumes:
+      - postgres_data_data:/var/lib/postgresql/data
+      - ./database_setup/db/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "${DATA_DB_EXPOSED_PORT:-55433}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${DATA_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - financialedapp-network
+    logging: *default-logging
+
+  # ---------------------------------------------------------------------------
+  # Redis — cache, rate-limit store, WebSocket pub/sub
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: financialedapp-cache
+    restart: unless-stopped
+    # Require password + enable AOF persistence + set memory policy
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD}
+      --appendonly yes
+      --maxmemory ${REDIS_MAX_MEMORY:-256mb}
+      --maxmemory-policy allkeys-lru
+      --tcp-keepalive 60
+      --timeout 300
+    volumes:
+      - redis_data:/data
+    ports:
+      - "${REDIS_EXPOSED_PORT:-56379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - financialedapp-network
+    logging: *default-logging
+
+  # ---------------------------------------------------------------------------
+  # Backend — FastAPI
+  # ---------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: runtime
+    image: financialedapp-backend:${APP_VERSION:-1.0.0}
+    container_name: financialedapp-api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # --- Application ---
+      APP_NAME: ${APP_NAME:-FinancialEdApp}
+      APP_VERSION: ${APP_VERSION:-1.0.0}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      DEBUG: ${DEBUG:-false}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      API_V1_PREFIX: ${API_V1_PREFIX:-/api/v1}
+
+      # --- CORS ---
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
+
+      # --- JWT / Security ---
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+
+      # --- Auth Database ---
+      AUTH_DB_HOST: postgres_auth
+      AUTH_DB_PORT: 5432
+      AUTH_DB_NAME: ${AUTH_DB_NAME}
+      AUTH_DB_USER: ${POSTGRES_USER}
+      AUTH_DB_PASSWORD: ${POSTGRES_PASSWORD}
+
+      # --- Data Database ---
+      DATA_DB_HOST: postgres_data
+      DATA_DB_PORT: 5432
+      DATA_DB_NAME: ${DATA_DB_NAME}
+      DATA_DB_USER: ${POSTGRES_USER}
+      DATA_DB_PASSWORD: ${POSTGRES_PASSWORD}
+
+      # --- Connection Pool (all tunable via env) ---
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-20}
+      DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-40}
+      DB_POOL_TIMEOUT: ${DB_POOL_TIMEOUT:-30}
+      DB_POOL_RECYCLE: ${DB_POOL_RECYCLE:-1800}
+      DB_POOL_PRE_PING: ${DB_POOL_PRE_PING:-true}
+      PGBOUNCER_MODE: ${PGBOUNCER_MODE:-false}
+
+      # --- Redis ---
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      REDIS_MAX_CONNECTIONS: ${REDIS_MAX_CONNECTIONS:-50}
+      REDIS_SOCKET_CONNECT_TIMEOUT: ${REDIS_SOCKET_CONNECT_TIMEOUT:-5}
+      REDIS_RETRY_ON_TIMEOUT: ${REDIS_RETRY_ON_TIMEOUT:-true}
+
+      # --- Cache TTLs ---
+      CACHE_TTL_USER_PROFILE: ${CACHE_TTL_USER_PROFILE:-300}
+      CACHE_TTL_EXPENSES: ${CACHE_TTL_EXPENSES:-300}
+      CACHE_TTL_BUDGETS: ${CACHE_TTL_BUDGETS:-300}
+      CACHE_TTL_GOALS: ${CACHE_TTL_GOALS:-300}
+      CACHE_TTL_ACCESS_TOKEN: ${CACHE_TTL_ACCESS_TOKEN:-1800}
+      CACHE_TTL_EXCHANGE_RATES: ${CACHE_TTL_EXCHANGE_RATES:-3600}
+
+      # --- Rate Limiting ---
+      RATE_LIMIT_LOGIN_LIMIT: ${RATE_LIMIT_LOGIN_LIMIT:-5}
+      RATE_LIMIT_LOGIN_WINDOW: ${RATE_LIMIT_LOGIN_WINDOW:-60}
+      RATE_LIMIT_REGISTER_LIMIT: ${RATE_LIMIT_REGISTER_LIMIT:-3}
+      RATE_LIMIT_REGISTER_WINDOW: ${RATE_LIMIT_REGISTER_WINDOW:-60}
+      RATE_LIMIT_FORGOT_PASSWORD_LIMIT: ${RATE_LIMIT_FORGOT_PASSWORD_LIMIT:-3}
+      RATE_LIMIT_FORGOT_PASSWORD_WINDOW: ${RATE_LIMIT_FORGOT_PASSWORD_WINDOW:-3600}
+      RATE_LIMIT_REFRESH_LIMIT: ${RATE_LIMIT_REFRESH_LIMIT:-10}
+      RATE_LIMIT_REFRESH_WINDOW: ${RATE_LIMIT_REFRESH_WINDOW:-60}
+      RATE_LIMIT_OAUTH_LIMIT: ${RATE_LIMIT_OAUTH_LIMIT:-10}
+      RATE_LIMIT_OAUTH_WINDOW: ${RATE_LIMIT_OAUTH_WINDOW:-60}
+      RATE_LIMIT_EXPORTS_LIMIT: ${RATE_LIMIT_EXPORTS_LIMIT:-10}
+      RATE_LIMIT_EXPORTS_WINDOW: ${RATE_LIMIT_EXPORTS_WINDOW:-60}
+      RATE_LIMIT_ANALYTICS_LIMIT: ${RATE_LIMIT_ANALYTICS_LIMIT:-30}
+      RATE_LIMIT_ANALYTICS_WINDOW: ${RATE_LIMIT_ANALYTICS_WINDOW:-60}
+      RATE_LIMIT_DEFAULT_AUTH_LIMIT: ${RATE_LIMIT_DEFAULT_AUTH_LIMIT:-300}
+      RATE_LIMIT_DEFAULT_AUTH_WINDOW: ${RATE_LIMIT_DEFAULT_AUTH_WINDOW:-60}
+      RATE_LIMIT_DEFAULT_UNAUTH_LIMIT: ${RATE_LIMIT_DEFAULT_UNAUTH_LIMIT:-60}
+      RATE_LIMIT_DEFAULT_UNAUTH_WINDOW: ${RATE_LIMIT_DEFAULT_UNAUTH_WINDOW:-60}
+      RATE_LIMIT_LOCKOUT_MAX_FAILURES: ${RATE_LIMIT_LOCKOUT_MAX_FAILURES:-5}
+      RATE_LIMIT_LOCKOUT_WINDOW: ${RATE_LIMIT_LOCKOUT_WINDOW:-900}
+
+      # --- Email ---
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-noreply@financialedu.com}
+      EMAIL_ENABLED: ${EMAIL_ENABLED:-false}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+
+      # --- Notifications ---
+      NOTIFICATION_RETENTION_DAYS: ${NOTIFICATION_RETENTION_DAYS:-30}
+      BUDGET_ALERT_THRESHOLD: ${BUDGET_ALERT_THRESHOLD:-80.0}
+
+      # --- OAuth (optional — disable if not configured) ---
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      APPLE_CLIENT_ID: ${APPLE_CLIENT_ID:-}
+      APPLE_TEAM_ID: ${APPLE_TEAM_ID:-}
+      APPLE_KEY_ID: ${APPLE_KEY_ID:-}
+      APPLE_PRIVATE_KEY: ${APPLE_PRIVATE_KEY:-}
+
+      # --- Multi-currency ---
+      OPEN_EXCHANGE_RATES_API_KEY: ${OPEN_EXCHANGE_RATES_API_KEY:-}
+      BASE_CURRENCY: ${BASE_CURRENCY:-USD}
+
+      # --- Feature flags ---
+      FEATURE_2FA_ENABLED: ${FEATURE_2FA_ENABLED:-true}
+      FEATURE_OAUTH_ENABLED: ${FEATURE_OAUTH_ENABLED:-true}
+      FEATURE_WEBSOCKET_ENABLED: ${FEATURE_WEBSOCKET_ENABLED:-true}
+      FEATURE_GDPR_ENABLED: ${FEATURE_GDPR_ENABLED:-true}
+      FEATURE_ADMIN_ENABLED: ${FEATURE_ADMIN_ENABLED:-true}
+      FEATURE_CURRENCY_CONVERSION_ENABLED: ${FEATURE_CURRENCY_CONVERSION_ENABLED:-true}
+
+    depends_on:
+      postgres_auth:
+        condition: service_healthy
+      postgres_data:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    volumes:
+      - logs:/app/logs
+    networks:
+      - financialedapp-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging: *default-logging
+
+  # ---------------------------------------------------------------------------
+  # ARQ Worker — background tasks (budget alerts, loan reminders, email, crons)
+  # Shares the same image as the backend; just a different entrypoint.
+  # ---------------------------------------------------------------------------
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: runtime
+    image: financialedapp-backend:${APP_VERSION:-1.0.0}
+    container_name: financialedapp-worker
+    restart: unless-stopped
+    command: ["python", "-m", "arq", "app.core.worker.WorkerSettings"]
+    env_file: .env
+    environment:
+      # Same environment block as backend — worker reads all the same settings
+      APP_NAME: ${APP_NAME:-FinancialEdApp}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      DEBUG: ${DEBUG:-false}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      AUTH_DB_HOST: postgres_auth
+      AUTH_DB_PORT: 5432
+      AUTH_DB_NAME: ${AUTH_DB_NAME}
+      AUTH_DB_USER: ${POSTGRES_USER}
+      AUTH_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DATA_DB_HOST: postgres_data
+      DATA_DB_PORT: 5432
+      DATA_DB_NAME: ${DATA_DB_NAME}
+      DATA_DB_USER: ${POSTGRES_USER}
+      DATA_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-10}
+      DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-20}
+      DB_POOL_TIMEOUT: ${DB_POOL_TIMEOUT:-30}
+      DB_POOL_RECYCLE: ${DB_POOL_RECYCLE:-1800}
+      DB_POOL_PRE_PING: ${DB_POOL_PRE_PING:-true}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      REDIS_MAX_CONNECTIONS: ${REDIS_MAX_CONNECTIONS:-20}
+      EMAIL_ENABLED: ${EMAIL_ENABLED:-false}
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-noreply@financialedu.com}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      NOTIFICATION_RETENTION_DAYS: ${NOTIFICATION_RETENTION_DAYS:-30}
+      SEND_BUDGET_ALERTS: ${SEND_BUDGET_ALERTS:-true}
+      SEND_LOAN_REMINDERS: ${SEND_LOAN_REMINDERS:-true}
+      BUDGET_ALERT_THRESHOLD: ${BUDGET_ALERT_THRESHOLD:-80.0}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+    depends_on:
+      postgres_auth:
+        condition: service_healthy
+      postgres_data:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - logs:/app/logs
+    networks:
+      - financialedapp-network
+    logging: *default-logging
+
+  # ---------------------------------------------------------------------------
+  # Frontend — React / Vite
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000/api/v1}
+        VITE_APP_NAME: ${APP_NAME:-FinancialEdApp}
+        VITE_APP_VERSION: ${APP_VERSION:-1.0.0}
+        VITE_ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+    image: financialedapp-frontend:${APP_VERSION:-1.0.0}
+    container_name: financialedapp-web
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    networks:
+      - financialedapp-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging: *default-logging
+
+# =============================================================================
+# Named volumes
+# =============================================================================
+volumes:
+  postgres_auth_data:
+    driver: local
+  postgres_data_data:
+    driver: local
+  redis_data:
+    driver: local
+  logs:
+    driver: local
+
+# =============================================================================
+# Network
+# =============================================================================
+networks:
+  financialedapp-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

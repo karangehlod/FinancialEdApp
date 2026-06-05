@@ -1,0 +1,57 @@
+graph TB
+    subgraph Frontend["Frontend Layer"]
+        React[React 18 PWA<br/>Vite, TailwindCSS, shadcn/ui<br/>React Query, Zustand]
+    end
+
+    subgraph Gateway["API Gateway Layer"]
+        Nginx[Nginx<br/>Load Balancing<br/>JWT Auth<br/>Rate Limiting]
+    end
+
+    subgraph Backend["Backend Layer - Python 3.11 + FastAPI"]
+        Auth[Auth Service<br/>JWT, OAuth2]
+        User[User Service<br/>Profile, DPDPA]
+        Budget[Budget Service<br/>Expenses, Analytics]
+        Debt[Debt Service<br/>Loans, EMI, Payoff]
+        AI[AI Agent Service<br/>LangGraph, MCP]
+        Notify[Notification Service<br/>Email, Push, SMS]
+    end
+
+    subgraph Data["Data Layer"]
+        Postgres[(PostgreSQL 16<br/>+ pgvector<br/>9 Tables)]
+        Redis[(Redis 7<br/>Cache + Sessions)]
+    end
+
+    subgraph External["External Services"]
+        OpenAI[Azure OpenAI<br/>gpt-4]
+    end
+
+    React --> Nginx
+    Nginx --> Auth
+    Nginx --> User
+    Nginx --> Budget
+    Nginx --> Debt
+    Nginx --> AI
+    Nginx --> Notify
+
+    Auth --> Postgres
+    User --> Postgres
+    Budget --> Postgres
+    Debt --> Postgres
+    AI --> Postgres
+    Notify --> Postgres
+
+    Auth --> Redis
+    Budget --> Redis
+    AI --> Redis
+
+    AI --> OpenAI
+
+    classDef frontend fill:#60a5fa,stroke:#2563eb,color:#fff
+    classDef backend fill:#34d399,stroke:#059669,color:#fff
+    classDef data fill:#fbbf24,stroke:#d97706,color:#000
+    classDef external fill:#a78bfa,stroke:#7c3aed,color:#fff
+
+    class React frontend
+    class Auth,User,Budget,Debt,AI,Notify backend
+    class Postgres,Redis data
+    class OpenAI external

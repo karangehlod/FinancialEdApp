@@ -1,0 +1,513 @@
+name: Build, Test, and Deploy
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+env:
+  REGISTRY: ghcr.io
+  BACKEND_IMAGE_NAME: ${{ github.repository }}/backend
+  FRONTEND_IMAGE_NAME: ${{ github.repository }}/frontend
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ────────────────────────────────────────────────────────────────
+  # LINT & TYPE CHECK
+  # ────────────────────────────────────────────────────────────────
+
+  lint-backend:
+    name: Lint Backend (Python)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.11']
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pylint flake8 black isort
+
+      - name: Run linting (flake8)
+        run: |
+          cd backend
+          flake8 app --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 app --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      - name: Check code format (black)
+        run: |
+          cd backend
+          black --check app
+
+      - name: Check import ordering (isort)
+        run: |
+          cd backend
+          isort --check-only app
+
+  lint-frontend:
+    name: Lint Frontend (TypeScript/ESLint)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: 'frontend/package-lock.json'
+
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Run ESLint
+        run: |
+          cd frontend
+          npm run lint --if-present
+
+      - name: TypeScript type check
+        run: |
+          cd frontend
+          npm run type-check --if-present || npx tsc --noEmit
+
+  # ────────────────────────────────────────────────────────────────
+  # UNIT & INTEGRATION TESTS
+  # ────────────────────────────────────────────────────────────────
+
+  test-backend:
+    name: Test Backend
+    runs-on: ubuntu-latest
+    needs: lint-backend
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: financialedapp_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    strategy:
+      matrix:
+        python-version: ['3.11']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-asyncio pytest-mock
+
+      - name: Create test database
+        env:
+          DATABASE_URL: postgresql://testuser:testpass@localhost:5432/financialedapp_test
+          REDIS_URL: redis://localhost:6379/0
+        run: |
+          cd backend
+          python -c "import app.db.session; print('DB connection OK')"
+
+      - name: Run unit tests
+        env:
+          DATABASE_URL: postgresql://testuser:testpass@localhost:5432/financialedapp_test
+          REDIS_URL: redis://localhost:6379/0
+        run: |
+          cd backend
+          pytest app/tests/unit --cov=app --cov-report=xml --cov-report=term
+
+      - name: Run integration tests
+        env:
+          DATABASE_URL: postgresql://testuser:testpass@localhost:5432/financialedapp_test
+          REDIS_URL: redis://localhost:6379/0
+        run: |
+          cd backend
+          pytest app/tests/integration --cov=app --cov-report=xml --cov-append
+
+      - name: Enforce minimum coverage (70%)
+        run: |
+          cd backend
+          python - <<'EOF'
+          import xml.etree.ElementTree as ET, sys
+          tree = ET.parse("coverage.xml")
+          root = tree.getroot()
+          line_rate = float(root.attrib.get("line-rate", "0"))
+          pct = round(line_rate * 100, 1)
+          threshold = 70
+          print(f"Backend coverage: {pct}% (threshold: {threshold}%)")
+          if pct < threshold:
+              print(f"FAIL: coverage {pct}% is below minimum {threshold}%", file=sys.stderr)
+              sys.exit(1)
+          EOF
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./backend/coverage.xml
+          flags: backend
+          name: backend-coverage
+          fail_ci_if_error: false
+
+  test-frontend:
+    name: Test Frontend
+    runs-on: ubuntu-latest
+    needs: lint-frontend
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: 'frontend/package-lock.json'
+
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Run unit tests
+        run: |
+          cd frontend
+          npm run test -- --coverage --watchAll=false || npm test --if-present
+
+      - name: Enforce minimum frontend coverage (50%)
+        run: |
+          cd frontend
+          node -e "
+          const fs = require('fs');
+          if (!fs.existsSync('coverage/coverage-summary.json')) {
+            console.log('No coverage summary found — skipping check');
+            process.exit(0);
+          }
+          const summary = JSON.parse(fs.readFileSync('coverage/coverage-summary.json', 'utf8'));
+          const total = summary.total;
+          const pct = total.lines.pct;
+          const threshold = 50;
+          console.log('Frontend line coverage: ' + pct + '% (threshold: ' + threshold + '%)');
+          if (pct < threshold) {
+            console.error('FAIL: frontend coverage ' + pct + '% is below ' + threshold + '%');
+            process.exit(1);
+          }
+          "
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./frontend/coverage/coverage-final.json
+          flags: frontend
+          name: frontend-coverage
+          fail_ci_if_error: false
+
+  # ────────────────────────────────────────────────────────────────
+  # SECURITY SCANNING
+  # ────────────────────────────────────────────────────────────────
+
+  security-backend:
+    name: Security Scan Backend
+    runs-on: ubuntu-latest
+    needs: lint-backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install security tools
+        run: |
+          pip install bandit safety
+
+      - name: Run Bandit (code security)
+        run: |
+          cd backend
+          bandit -r app -f json -o bandit-report.json || true
+
+      - name: Check dependencies (safety)
+        run: |
+          cd backend
+          safety check --json || true
+
+  security-frontend:
+    name: Security Scan Frontend
+    runs-on: ubuntu-latest
+    needs: lint-frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run npm audit
+        run: |
+          cd frontend
+          npm audit --json > npm-audit.json || true
+
+  # ────────────────────────────────────────────────────────────────
+  # BUILD DOCKER IMAGES
+  # ────────────────────────────────────────────────────────────────
+
+  build-backend:
+    name: Build Backend Docker Image
+    runs-on: ubuntu-latest
+    needs: [test-backend, security-backend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=sha
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  build-frontend:
+    name: Build Frontend Docker Image
+    runs-on: ubuntu-latest
+    needs: [test-frontend, security-frontend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=sha
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./frontend
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ────────────────────────────────────────────────────────────────
+  # DEPLOY TO STAGING
+  # ────────────────────────────────────────────────────────────────
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [build-backend, build-frontend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment:
+      name: staging
+      url: https://staging.financialedapp.example.com
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to staging environment
+        run: |
+          echo "Deploying to staging..."
+          # Add your deployment commands here
+          # Example: kubectl apply -f k8s/staging/
+          # Example: helm upgrade --install financialedapp k8s/helm/financialedapp -f k8s/values-staging.yaml
+
+      - name: Notify deployment
+        if: always()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const deployment = '${{ job.status }}'
+            console.log(`Staging deployment ${deployment}`)
+
+  # ────────────────────────────────────────────────────────────────
+  # SMOKE TESTS
+  # ────────────────────────────────────────────────────────────────
+
+  smoke-tests:
+    name: Smoke Tests
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.x'
+
+      - name: Install Playwright
+        run: |
+          npm install -D @playwright/test
+
+      - name: Run smoke tests
+        run: |
+          # Run basic smoke tests against staging
+          echo "Running smoke tests..."
+          # npx playwright test --project=chromium --grep @smoke
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: smoke-test-results
+          path: test-results/
+
+  # ────────────────────────────────────────────────────────────────
+  # DEPLOY TO PRODUCTION
+  # ────────────────────────────────────────────────────────────────
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: smoke-tests
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url: https://app.financialedapp.example.com
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to production
+        run: |
+          echo "Deploying to production..."
+          # Add your production deployment commands here
+          # Example: kubectl apply -f k8s/production/
+          # Example: helm upgrade --install financialedapp k8s/helm/financialedapp -f k8s/values-prod.yaml
+
+      - name: Create GitHub Release
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const tag = context.ref.replace('refs/heads/', '')
+            console.log(`Creating release for ${tag}`)
+
+  # ────────────────────────────────────────────────────────────────
+  # NOTIFICATION
+  # ────────────────────────────────────────────────────────────────
+
+  notify:
+    name: Send Notifications
+    runs-on: ubuntu-latest
+    needs: [lint-backend, lint-frontend, test-backend, test-frontend]
+    if: always()
+    steps:
+      - name: Determine status
+        id: status
+        run: |
+          if [ "${{ needs.lint-backend.result }}" == "failure" ] || \
+             [ "${{ needs.lint-frontend.result }}" == "failure" ] || \
+             [ "${{ needs.test-backend.result }}" == "failure" ] || \
+             [ "${{ needs.test-frontend.result }}" == "failure" ]; then
+            echo "status=failure" >> $GITHUB_OUTPUT
+          else
+            echo "status=success" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Notify on failure
+        if: steps.status.outputs.status == 'failure'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '❌ Pipeline failed. Please review the logs.'
+            })
+
+      - name: Notify on success
+        if: steps.status.outputs.status == 'success'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            console.log('✅ Pipeline completed successfully')

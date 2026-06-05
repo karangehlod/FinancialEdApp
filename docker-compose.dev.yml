@@ -1,0 +1,112 @@
+# =============================================================================
+# FinancialEdApp — LOCAL DEVELOPMENT Docker Compose
+# =============================================================================
+# Spins up ONLY the infrastructure services needed for local backend dev:
+#   - postgres_auth   (port 55432 → 5432)
+#   - postgres_data   (port 55433 → 5432)
+#   - redis           (port 56379 → 6379)
+#
+# The backend itself is run directly via the venv (not in Docker) for a
+# faster dev loop with hot-reload.
+#
+# Usage:
+#   docker compose -f docker-compose.dev.yml up -d
+#   docker compose -f docker-compose.dev.yml down -v   # tear down + wipe volumes
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Auth PostgreSQL (users, refresh_tokens, oauth_accounts)
+  # ---------------------------------------------------------------------------
+  postgres_auth:
+    image: postgres:16-alpine
+    container_name: finedu-auth-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: finedu_admin
+      POSTGRES_PASSWORD: finedu_admin_password
+      POSTGRES_DB: auth_db
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=en_US.UTF-8"
+    volumes:
+      - dev_postgres_auth_data:/var/lib/postgresql/data
+      - ./database_setup/db/init/01-auth-init.sql:/docker-entrypoint-initdb.d/01-auth-init.sql:ro
+    ports:
+      - "55432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finedu_admin -d auth_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks:
+      - finedu-dev-network
+
+  # ---------------------------------------------------------------------------
+  # Data PostgreSQL (expenses, budgets, goals, loans …)
+  # ---------------------------------------------------------------------------
+  postgres_data:
+    image: postgres:16-alpine
+    container_name: finedu-data-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: finedu_admin
+      POSTGRES_PASSWORD: finedu_admin_password
+      POSTGRES_DB: financial_ed_db
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=en_US.UTF-8"
+    volumes:
+      - dev_postgres_data_data:/var/lib/postgresql/data
+      - ./database_setup/db/init/02-data-init.sql:/docker-entrypoint-initdb.d/02-data-init.sql:ro
+    ports:
+      - "55433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finedu_admin -d financial_ed_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks:
+      - finedu-dev-network
+
+  # ---------------------------------------------------------------------------
+  # Redis — cache, rate-limit store, WebSocket pub/sub
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: finedu-cache
+    restart: unless-stopped
+    command: >
+      redis-server
+      --requirepass finedu_redis_password
+      --appendonly yes
+      --maxmemory 128mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - dev_redis_data:/data
+    ports:
+      - "56379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "finedu_redis_password", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - finedu-dev-network
+
+# =============================================================================
+# Named volumes
+# =============================================================================
+volumes:
+  dev_postgres_auth_data:
+    driver: local
+  dev_postgres_data_data:
+    driver: local
+  dev_redis_data:
+    driver: local
+
+# =============================================================================
+# Network
+# =============================================================================
+networks:
+  finedu-dev-network:
+    driver: bridge

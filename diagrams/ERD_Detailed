@@ -1,0 +1,116 @@
+classDiagram
+    class USERS {
+        +UUID id PK
+        +VARCHAR(255) email UK NOT_NULL
+        +VARCHAR(255) password_hash NOT_NULL
+        +VARCHAR(255) name
+        +VARCHAR(2) country DEFAULT_IN
+        +VARCHAR(3) currency DEFAULT_INR
+        +VARCHAR(20) knowledge_level
+        +VARCHAR(20) risk_tolerance
+        +BOOLEAN consent_given DEFAULT_FALSE
+        +TIMESTAMP consent_timestamp
+        +TIMESTAMP created_at DEFAULT_NOW
+        +TIMESTAMP updated_at DEFAULT_NOW
+    }
+
+    class EXPENSES {
+        +UUID id PK
+        +UUID user_id FK_CASCADE
+        +DECIMAL(15,2) amount NOT_NULL
+        +VARCHAR(50) category NOT_NULL
+        +VARCHAR(50) subcategory
+        +TEXT description
+        +DATE date NOT_NULL
+        +VARCHAR(255) merchant
+        +VARCHAR(50) payment_method
+        +BOOLEAN is_recurring DEFAULT_FALSE
+        +TIMESTAMP created_at DEFAULT_NOW
+    }
+
+    class LOANS {
+        +UUID id PK
+        +UUID user_id FK_CASCADE
+        +VARCHAR(20) loan_type NOT_NULL
+        +VARCHAR(255) lender
+        +DECIMAL(15,2) principal NOT_NULL
+        +DECIMAL(5,2) interest_rate NOT_NULL
+        +INT tenure_months NOT_NULL
+        +DECIMAL(15,2) emi_amount NOT_NULL
+        +DECIMAL(15,2) outstanding_balance NOT_NULL
+        +DATE start_date NOT_NULL
+        +DATE maturity_date
+        +TIMESTAMP created_at DEFAULT_NOW
+    }
+
+    class LOAN_PAYMENTS {
+        +UUID id PK
+        +UUID loan_id FK_CASCADE
+        +DATE payment_date NOT_NULL
+        +DECIMAL(15,2) principal_paid NOT_NULL
+        +DECIMAL(15,2) interest_paid NOT_NULL
+        +DECIMAL(15,2) extra_payment DEFAULT_0
+        +DECIMAL(15,2) outstanding_after_payment NOT_NULL
+    }
+
+    class BUDGETS {
+        +UUID id PK
+        +UUID user_id FK_CASCADE
+        +DATE month NOT_NULL
+        +VARCHAR(50) category NOT_NULL
+        +DECIMAL(15,2) allocated_amount
+        +DECIMAL(15,2) spent_amount DEFAULT_0
+        +DECIMAL(15,2) recommended_amount
+        +TIMESTAMP created_at DEFAULT_NOW
+    }
+
+    class LEARNING_PROGRESS {
+        +UUID id PK
+        +UUID user_id FK_CASCADE
+        +VARCHAR(100) topic NOT_NULL
+        +VARCHAR(255) concept NOT_NULL
+        +INT mastery_level CHECK_0_100
+        +TIMESTAMP last_practiced
+        +JSONB quiz_scores
+    }
+
+    class FINANCIAL_CONCEPTS {
+        +UUID id PK
+        +VARCHAR(255) concept_name NOT_NULL
+        +VARCHAR(50) category NOT_NULL
+        +VARCHAR(20) difficulty_level
+        +TEXT content NOT_NULL
+        +VECTOR(1536) embedding pgvector
+        +JSONB examples
+        +UUID[] related_concepts
+        +TIMESTAMP created_at DEFAULT_NOW
+    }
+
+    class AI_REPORTS {
+        +UUID id PK
+        +UUID user_id FK_CASCADE
+        +VARCHAR(20) report_type NOT_NULL
+        +JSONB report_content NOT_NULL
+        +TEXT[] insights
+        +TEXT[] recommendations
+        +TIMESTAMP generated_at DEFAULT_NOW
+    }
+
+    class AGENT_INTERACTIONS {
+        +UUID id PK
+        +UUID user_id FK_CASCADE
+        +VARCHAR(50) agent_name NOT_NULL
+        +VARCHAR(100) agent_action NOT_NULL
+        +JSONB request_payload
+        +JSONB response_payload
+        +INT execution_time_ms
+        +TIMESTAMP timestamp DEFAULT_NOW
+    }
+
+    USERS "1" --> "0..*" EXPENSES : has
+    USERS "1" --> "0..*" LOANS : has
+    USERS "1" --> "0..*" BUDGETS : has
+    USERS "1" --> "0..*" LEARNING_PROGRESS : has
+    USERS "1" --> "0..*" AI_REPORTS : has
+    USERS "1" --> "0..*" AGENT_INTERACTIONS : has
+    LOANS "1" --> "0..*" LOAN_PAYMENTS : has

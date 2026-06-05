@@ -1,0 +1,315 @@
+name: CD — Build, Push & Deploy
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Deployment target"
+        required: true
+        default: "staging"
+        type: choice
+        options: [staging, production]
+      image_tag:
+        description: "Image tag to deploy (defaults to latest SHA)"
+        required: false
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false   # Never cancel in-progress deploys
+
+env:
+  REGISTRY: ghcr.io
+  BACKEND_IMAGE: ${{ github.repository }}/backend
+  FRONTEND_IMAGE: ${{ github.repository }}/frontend
+  K8S_NAMESPACE: financialedapp
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Job 1: Determine image tag + environment
+  # ---------------------------------------------------------------------------
+  setup:
+    name: Setup — Determine Image Tag & Environment
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.tag.outputs.tag }}
+      environment: ${{ steps.env.outputs.environment }}
+      deploy_production: ${{ steps.env.outputs.deploy_production }}
+
+    steps:
+      - name: Determine image tag
+        id: tag
+        run: |
+          if [ -n "${{ github.event.inputs.image_tag }}" ]; then
+            echo "tag=${{ github.event.inputs.image_tag }}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${{ github.sha }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Determine deployment environment
+        id: env
+        run: |
+          if [[ "${{ github.event.inputs.environment }}" == "production" ]] || \
+             [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            echo "environment=production" >> $GITHUB_OUTPUT
+            echo "deploy_production=true" >> $GITHUB_OUTPUT
+          else
+            echo "environment=staging" >> $GITHUB_OUTPUT
+            echo "deploy_production=false" >> $GITHUB_OUTPUT
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Job 2: Build and push Docker images to GHCR
+  # ---------------------------------------------------------------------------
+  build-and-push:
+    name: Build & Push Docker Images
+    runs-on: ubuntu-latest
+    needs: [setup]
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata (backend)
+        id: meta-backend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=tag
+            type=sha,prefix=sha-,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: backend
+          file: backend/Dockerfile
+          push: true
+          tags: ${{ steps.meta-backend.outputs.tags }}
+          labels: ${{ steps.meta-backend.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILD_VERSION=${{ needs.setup.outputs.image_tag }}
+            BUILD_DATE=${{ github.event.repository.updated_at }}
+            GIT_COMMIT=${{ github.sha }}
+
+      - name: Extract Docker metadata (frontend)
+        id: meta-frontend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=tag
+            type=sha,prefix=sha-,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: frontend
+          file: frontend/Dockerfile
+          push: true
+          tags: ${{ steps.meta-frontend.outputs.tags }}
+          labels: ${{ steps.meta-frontend.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VITE_API_URL=${{ vars.VITE_API_URL }}
+            BUILD_VERSION=${{ needs.setup.outputs.image_tag }}
+
+      - name: Output image digests
+        run: |
+          echo "Backend: ${{ steps.meta-backend.outputs.tags }}"
+          echo "Frontend: ${{ steps.meta-frontend.outputs.tags }}"
+
+  # ---------------------------------------------------------------------------
+  # Job 3: Deploy to Staging
+  # ---------------------------------------------------------------------------
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [setup, build-and-push]
+    if: needs.setup.outputs.environment == 'staging'
+    environment:
+      name: staging
+      url: https://staging.financialedu.com
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: v1.28.0
+
+      - name: Configure kubectl (Staging)
+        run: |
+          echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > /tmp/kubeconfig
+          echo "KUBECONFIG=/tmp/kubeconfig" >> $GITHUB_ENV
+
+      - name: Deploy backend to staging
+        run: |
+          kubectl set image deployment/backend \
+            backend=${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:sha-${{ github.sha }} \
+            -n ${{ env.K8S_NAMESPACE }}
+          kubectl rollout status deployment/backend \
+            -n ${{ env.K8S_NAMESPACE }} \
+            --timeout=300s
+
+      - name: Deploy frontend to staging
+        run: |
+          kubectl set image deployment/frontend \
+            frontend=${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:sha-${{ github.sha }} \
+            -n ${{ env.K8S_NAMESPACE }}
+          kubectl rollout status deployment/frontend \
+            -n ${{ env.K8S_NAMESPACE }} \
+            --timeout=300s
+
+      - name: Smoke test staging
+        run: |
+          STAGING_URL="https://staging.financialedu.com"
+          echo "Running smoke tests against $STAGING_URL"
+          curl -f "$STAGING_URL/health" || exit 1
+          curl -f "$STAGING_URL/api/v1/health" || exit 1
+          echo "✅ Smoke tests passed"
+
+      - name: Notify Slack on success
+        if: success()
+        uses: slackapi/slack-github-action@v1.25.0
+        with:
+          payload: |
+            {
+              "text": "✅ *Staging Deploy Successful*\n*Tag:* `${{ needs.setup.outputs.image_tag }}`\n*Commit:* ${{ github.sha }}\n*By:* ${{ github.actor }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Notify Slack on failure
+        if: failure()
+        uses: slackapi/slack-github-action@v1.25.0
+        with:
+          payload: |
+            {
+              "text": "❌ *Staging Deploy FAILED*\n*Tag:* `${{ needs.setup.outputs.image_tag }}`\n*Commit:* ${{ github.sha }}\n*By:* ${{ github.actor }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # ---------------------------------------------------------------------------
+  # Job 4: Deploy to Production (requires manual approval)
+  # ---------------------------------------------------------------------------
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [setup, build-and-push]
+    if: needs.setup.outputs.deploy_production == 'true'
+    environment:
+      name: production     # Requires GitHub Environment protection rules + manual approval
+      url: https://app.financialedu.com
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: v1.28.0
+
+      - name: Configure kubectl (Production)
+        run: |
+          echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" | base64 -d > /tmp/kubeconfig
+          echo "KUBECONFIG=/tmp/kubeconfig" >> $GITHUB_ENV
+
+      - name: Run pre-deployment checks
+        run: |
+          echo "Pre-deployment: verifying cluster health..."
+          kubectl get nodes -n ${{ env.K8S_NAMESPACE }}
+          kubectl get pods -n ${{ env.K8S_NAMESPACE }}
+
+      - name: Deploy backend (rolling update)
+        run: |
+          kubectl set image deployment/backend \
+            backend=${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:${{ needs.setup.outputs.image_tag }} \
+            -n ${{ env.K8S_NAMESPACE }}
+          kubectl annotate deployment/backend \
+            kubernetes.io/change-cause="Deploy ${{ needs.setup.outputs.image_tag }} by ${{ github.actor }}" \
+            -n ${{ env.K8S_NAMESPACE }} --overwrite
+          kubectl rollout status deployment/backend \
+            -n ${{ env.K8S_NAMESPACE }} \
+            --timeout=600s
+
+      - name: Deploy frontend (rolling update)
+        run: |
+          kubectl set image deployment/frontend \
+            frontend=${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:${{ needs.setup.outputs.image_tag }} \
+            -n ${{ env.K8S_NAMESPACE }}
+          kubectl rollout status deployment/frontend \
+            -n ${{ env.K8S_NAMESPACE }} \
+            --timeout=300s
+
+      - name: Run production smoke tests
+        run: |
+          PROD_URL="https://app.financialedu.com"
+          echo "Running smoke tests against $PROD_URL"
+          for i in 1 2 3; do
+            if curl -sf "$PROD_URL/health" && curl -sf "$PROD_URL/api/v1/health"; then
+              echo "✅ Smoke tests passed (attempt $i)"
+              exit 0
+            fi
+            echo "Attempt $i failed, retrying in 10s..."
+            sleep 10
+          done
+          echo "❌ Smoke tests failed after 3 attempts"
+          exit 1
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "⚠️  Deployment failed — rolling back..."
+          kubectl rollout undo deployment/backend -n ${{ env.K8S_NAMESPACE }}
+          kubectl rollout undo deployment/frontend -n ${{ env.K8S_NAMESPACE }}
+          kubectl rollout status deployment/backend -n ${{ env.K8S_NAMESPACE }} --timeout=120s
+          echo "Rollback completed"
+
+      - name: Create GitHub Release (on tag)
+        if: success() && startsWith(github.ref, 'refs/tags/')
+        uses: ncipollo/release-action@v1
+        with:
+          generateReleaseNotes: true
+          tag: ${{ needs.setup.outputs.image_tag }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Notify Slack
+        if: always()
+        uses: slackapi/slack-github-action@v1.25.0
+        with:
+          payload: |
+            {
+              "text": "${{ job.status == 'success' && '✅' || '❌' }} *Production Deploy ${{ job.status }}*\n*Tag:* `${{ needs.setup.outputs.image_tag }}`\n*By:* ${{ github.actor }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

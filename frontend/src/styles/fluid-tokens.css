@@ -1,0 +1,63 @@
+/* Fluid design tokens and small utilities
+   Centralized tokens for fluid, ratio-based scaling.
+   Use these tokens in component CSS to achieve continuous scaling across viewports.
+*/
+:root {
+  /* Typography */
+  --font-base: clamp(0.88rem, 1.2vw + 0.5rem, 1rem);
+  --font-sm: calc(var(--font-base) * 0.9);
+  --font-lg: calc(var(--font-base) * 1.15);
+
+  /* Header / navigation sizing */
+  --header-height: clamp(44px, 3.2vw + 18px, 80px);
+
+  /* Spacing and padding */
+  --card-padding: clamp(0.75rem, calc(var(--header-height) * 0.11), 1.5rem);
+  --fluid-container-padding: clamp(0.75rem, 2.5vw, 2rem);
+  --fluid-grid-gap: clamp(0.5rem, 1.5vw, 1.5rem);
+
+  /* Icon sizes derived from header height */
+  --icon-lg: calc(var(--header-height) * 0.32);
+  --icon-md: calc(var(--icon-lg) * 0.7);
+  --icon-sm: calc(var(--icon-md) * 0.75);
+
+  /* Page icon sizes */
+  --page-icon-size: clamp(40px, calc(var(--header-height) * 1.15), 180px);
+
+  /* Max readable content width (soft limit) */
+  --content-max-width: min(1200px, 96vw);
+
+  /* Responsive/fluid chart sizing token
+     Use this variable in components as inline min-height: var(--chart-min-height)
+     so charts and visualizations size fluidly across viewports without hard-coded values. */
+  --chart-min-height: clamp(180px, 18vh, 380px);
+  --chart-info-height: clamp(80px, 10vh, 160px);
+}
+
+/* Core utilities using tokens (kept small & generic) */
+.fluid-container {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: var(--fluid-container-padding);
+  padding-right: var(--fluid-container-padding);
+  max-width: var(--content-max-width);
+  box-sizing: border-box;
+}
+
+/* Generic fluid grid: uses auto-fit + minmax for continuous wrapping
+   Default min size is intentionally conservative; components may override via inline style or component props. */
+.fluid-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--fluid-grid-gap);
+  /* allow grid items to stretch to equal height so charts and cards can fill their space */
+  align-items: stretch;
+}
+
+/* Ensure direct children of the fluid grid behave as flexible columns so inner elements (charts) can grow to fill available space */
+.fluid-grid > * {
+  display: flex;
+  flex-direction: column;
+  min-height: 0; /* enable children to shrink properly within flex context */
+}
