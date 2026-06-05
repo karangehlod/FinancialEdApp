@@ -404,5 +404,5 @@ See [backend/docs/architecture.md](./backend/docs/architecture.md) for deploymen
 
 **Version**: 1.0.0  
 **Last Updated**: January 2026  
-**Status**: Production Ready ✅
+**Status**: Need to fix the issues found by CI
 
