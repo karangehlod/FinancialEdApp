@@ -61,6 +61,8 @@ interface HeaderProps {
 
 interface LayoutProps {
   readonly children: ReactNode
+  readonly showHeader?: boolean
+  readonly noContainer?: boolean
 }
 
 interface PageContainerProps {
@@ -501,7 +503,7 @@ export const Header = memo<HeaderProps>(function Header({
 
 // ── Layout ──────────────────────────────────────────────────────────────
 
-export function Layout({ children }: LayoutProps): JSX.Element {
+export function Layout({ children, showHeader = true, noContainer = false }: LayoutProps): JSX.Element {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarVisible, setSidebarVisible] = useState<boolean>(() => {
     try {
@@ -560,7 +562,7 @@ export function Layout({ children }: LayoutProps): JSX.Element {
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Header */}
-        {!isAuthRoute && (
+        {showHeader && !isAuthRoute && (
           <Header
             onMenuClick={() => setSidebarOpen((o) => !o)}
             onDesktopToggle={() => setSidebarVisible((v) => !v)}
@@ -569,11 +571,15 @@ export function Layout({ children }: LayoutProps): JSX.Element {
         )}
 
         <main className="flex-1 overflow-auto" id="main-content">
-          <div className="min-h-full py-4 sm:py-6">
-            <div className="fluid-container">
-              {children}
+          {noContainer ? (
+            children
+          ) : (
+            <div className="min-h-full py-4 sm:py-6">
+              <div className="fluid-container">
+                {children}
+              </div>
             </div>
-          </div>
+          )}
         </main>
       </div>
     </div>

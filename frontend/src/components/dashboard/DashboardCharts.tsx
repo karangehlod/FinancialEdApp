@@ -116,10 +116,11 @@ export const SpendingTrendChart: React.FC<{ data: Array<{ date: string; amount: 
           <YAxis stroke="#6b7280" />
           <RechartTooltip
             formatter={tooltipFormatter as any}
-            labelFormatter={(label: string) => {
-              if (viewType === '30days') return `Date: ${label}`
-              if (viewType === 'yearly') return `Year: ${label}`
-              return `Month: ${label}`
+            labelFormatter={(label: React.ReactNode) => {
+              const labelText = String(label ?? '')
+              if (viewType === '30days') return `Date: ${labelText}`
+              if (viewType === 'yearly') return `Year: ${labelText}`
+              return `Month: ${labelText}`
             }}
           />
           <Line type="monotone" dataKey="amount" stroke="#3b82f6" strokeWidth={2} dot={{ fill: '#3b82f6', r: viewType === '30days' ? 3 : 5 }} activeDot={{ r: 6 }} />

@@ -26,7 +26,7 @@ from app.core.error_handling_decorators import (
 )
 from app.core.rate_limiting_decorators import rate_limit, apply_preset_limit
 from app.config import settings
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 logger = get_logger(__name__)
 

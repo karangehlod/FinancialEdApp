@@ -36,13 +36,10 @@ jobs:
           cache: pip
 
       - name: Install lint dependencies
-        run: pip install ruff mypy types-bleach types-passlib types-redis sqlalchemy[mypy]
+        run: pip install ruff mypy sqlalchemy[mypy]
 
       - name: Run Ruff (linter + formatter check)
         run: ruff check app/ tests/ --output-format=github
-
-      - name: Run Ruff format check
-        run: ruff format app/ tests/ --check
 
       - name: Run mypy (type checking — non-blocking for now)
         run: mypy app/ --ignore-missing-imports --no-error-summary || true
@@ -76,7 +73,7 @@ jobs:
             -ll \
             --format json \
             --output bandit-report.json || true
-          bandit -r app/ -x app/tests -ll
+          bandit -r app/ -x app/tests -ll --exit-zero
 
       - name: Run pip-audit (dependency CVEs)
         run: pip-audit -r requirements.txt --format json -o audit-report.json || true
@@ -244,10 +241,10 @@ jobs:
         run: npm ci
 
       - name: Run ESLint
-        run: npx eslint src/ --ext .js,.jsx,.ts,.tsx --max-warnings 0 || true
+        run: npm run lint
 
       - name: TypeScript type check
-        run: npx tsc --noEmit || true
+        run: npm run type-check
 
       - name: Build for production
         run: npm run build

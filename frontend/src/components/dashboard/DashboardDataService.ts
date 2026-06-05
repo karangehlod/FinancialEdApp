@@ -85,6 +85,7 @@ export class DashboardDataService {
         const date = new Date(today)
         date.setDate(date.getDate() - i)
         const dateKey = date.toISOString().split('T')[0]
+        if (!dateKey) continue
         dailyMap[dateKey] = 0
       }
 
@@ -94,7 +95,7 @@ export class DashboardDataService {
         const expenseDate = new Date(dstr)
         if (isNaN(expenseDate.getTime())) return
         const dateKey = expenseDate.toISOString().split('T')[0]
-        if (dailyMap[dateKey] !== undefined) {
+        if (dateKey && dailyMap[dateKey] !== undefined) {
           const amount = parseFloat(String(expense?.amount)) || 0
           dailyMap[dateKey] = parseFloat((dailyMap[dateKey] + amount).toFixed(2))
         }

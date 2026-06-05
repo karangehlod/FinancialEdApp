@@ -27,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.repositories.interfaces import ILoanRepository
 from app.repositories.loan_repository import LoanRepository
 from app.schemas.loan import (
+    EMIImpactAnalysis,
     LoanAnalytics,
     LoanCreate,
     LoanPaymentCreate,

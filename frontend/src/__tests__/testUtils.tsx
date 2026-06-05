@@ -2,7 +2,7 @@
  * Shared test utilities following the testing-library best practices.
  * Provides typed render helpers, mock factories, and accessibility checkers.
  */
-import React, { type ReactElement } from 'react'
+import { type ReactElement } from 'react'
 import { render, type RenderResult } from '@testing-library/react'
 import { BrowserRouter, MemoryRouter, type MemoryRouterProps } from 'react-router-dom'
 import { vi } from 'vitest'

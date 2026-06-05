@@ -10,7 +10,7 @@
 import React, { useState, useCallback, type FormEvent, type ChangeEvent } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Lock, Mail, Eye, EyeOff, AlertCircle, CheckCircle, User } from 'lucide-react'
+import { Lock, Mail, Eye, EyeOff, AlertCircle, User } from 'lucide-react'
 
 import FinEdLogo from '../assets/FinEdLogo.png'
 import { useAuthStore } from '../store/authStore'

@@ -24,6 +24,7 @@ from app.db.models.data import Loan, LoanPayment
 from app.repositories.interfaces import ILoanRepository
 from app.repositories.loan_repository import LoanRepository
 from app.schemas.loan import (
+    EMIImpactAnalysis,
     LoanAnalytics,
     LoanResponse,
     LoanStatus,
@@ -386,6 +387,7 @@ class LoanAnalyticsService(BaseService):
     async def get_comprehensive_loan_analysis(self, user_id: UUID):
         """Return optimisation suggestions and budget integration data."""
         from app.schemas.loan import (
+    EMIImpactAnalysis,
             BudgetLoanIntegration,
             ComprehensiveLoanAnalysis,
             LoanOptimizationSuggestion,

@@ -67,15 +67,8 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: process.env.NODE_ENV !== 'production',  // No sourcemaps in prod for security
-    // Minify with terser for better dead code elimination
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: true,     // Remove console.* in production
-        drop_debugger: true,
-        pure_funcs: ['console.log', 'console.debug', 'console.info'],
-      },
-    },
+    // Use Vite's built-in esbuild minifier so CI does not require the optional terser package.
+    minify: 'esbuild',
     // Code splitting configuration for better bundle optimization
     rollupOptions: {
       output: {
@@ -96,13 +89,13 @@ export default defineConfig({
           'page-dashboard': ['./src/pages/DashboardPage.tsx'],
           'page-financial': [
             './src/pages/ExpensesPage.tsx',
-            './src/pages/BudgetsPage.jsx',
-            './src/pages/GoalsPage.jsx',
-            './src/pages/LoansPage.jsx',
+            './src/pages/BudgetsPage.tsx',
+            './src/pages/GoalsPage.tsx',
+            './src/pages/LoansPage.tsx',
           ],
-          'page-reports': ['./src/pages/ReportsPage.jsx'],
-          'page-settings': ['./src/pages/SettingsPage.jsx'],
-          'page-chat': ['./src/pages/ChatPage.jsx'],
+          'page-reports': ['./src/pages/ReportsPage.tsx'],
+          'page-settings': ['./src/pages/SettingsPage.tsx'],
+          'page-chat': ['./src/pages/ChatPage.tsx'],
 
           // Shared components
           'shared-components': ['./src/components/Layout.tsx'],

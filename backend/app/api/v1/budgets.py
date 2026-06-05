@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, Query, status, HTTPException, Request, R
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from typing import Optional, List
-from datetime import date, timezone
+from datetime import date, datetime, timezone
 import uuid
 
 from app.db.session import get_data_db

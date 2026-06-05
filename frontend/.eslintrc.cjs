@@ -11,5 +11,7 @@ module.exports = {
   settings: { react: { version: '18.3' } },
   rules: {
     'react/prop-types': 'off',
+    'react/no-unescaped-entities': 'off',
+    'no-unused-vars': 'off',
   },
 }

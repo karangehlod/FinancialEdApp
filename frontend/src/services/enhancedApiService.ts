@@ -103,7 +103,7 @@ export class EnhancedApiService {
     url: string,
     method: string,
     options?: ApiRequestOptions,
-    data?: unknown
+    _data?: unknown
   ): Promise<T> {
     const deduplicationKey = `${method}:${url}`
 
@@ -260,6 +260,7 @@ export class EnhancedApiService {
 
     for (let i = 0; i < queuedRequests.length; i++) {
       const request = queuedRequests[i]
+      if (!request) continue
 
       await this.retryQueuedRequest(
         request.id,
