@@ -1,4 +1,4 @@
-name: CD — Build, Push & Deploy
+name: CD - Build, Push & Deploy
 
 on:
   push:
@@ -174,7 +174,7 @@ jobs:
       - name: Deploy backend to staging
         run: |
           kubectl set image deployment/backend \
-            backend=${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:sha-${{ github.sha }} \
+            backend=${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:${{ needs.setup.outputs.image_tag }} \
             -n ${{ env.K8S_NAMESPACE }}
           kubectl rollout status deployment/backend \
             -n ${{ env.K8S_NAMESPACE }} \
@@ -183,7 +183,7 @@ jobs:
       - name: Deploy frontend to staging
         run: |
           kubectl set image deployment/frontend \
-            frontend=${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:sha-${{ github.sha }} \
+            frontend=${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:${{ needs.setup.outputs.image_tag }} \
             -n ${{ env.K8S_NAMESPACE }}
           kubectl rollout status deployment/frontend \
             -n ${{ env.K8S_NAMESPACE }} \
