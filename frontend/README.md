@@ -1,150 +1,218 @@
-# FinancialEdApp — Frontend
+# Financial Education App - Frontend
 
-This document describes the frontend application for FinancialEdApp. It covers features, architecture, how things work, how to run locally and in Docker, build and deployment steps, scaling guidance, testing, and contribution notes.
+A modern, interactive React frontend for the Financial Education Application. Built with React 18, Tailwind CSS, Framer Motion, and Zustand for state management.
 
-Table of contents
-- Project summary
-- Key features
-- Tech stack
-- Repo layout
-- How it works (high level)
-- Running locally
-- Building for production
-- Docker and deployment
-- Integrating with the backend
-- Testing
-- Accessibility and responsiveness
-- Scaling & performance guidance
-- Contribution guide
-- Interview guide / talking points
+## 🎯 Features
 
-Project summary
----------------
-The frontend is a single-page application (SPA) built with modern frontend tooling. It provides user interface for account management, dashboards, budgets, goals, transaction views and the conversational advisor interface that interacts with the backend agent.
+- **Authentication**: Secure login/registration with JWT tokens
+- **Dashboard**: Overview of financial metrics and quick access cards
+- **Expenses Management**: Track and categorize expenses with filters
+- **Budget Planning**: Set spending limits and monitor alerts
+- **Financial Goals**: Set and track savings goals with progress tracking
+- **Loan Management**: Track loans with interest rates and terms
+- **Responsive Design**: Mobile-first, fully responsive UI
+- **Modern Animations**: Smooth transitions and interactive elements
+- **Real-time Updates**: State management with Zustand
 
-Key features
-------------
-- Responsive UI for dashboards, budgets, goals and transaction history
-- Conversation UI for asking the financial advisor (LangChain-backed) questions
-- Authentication flows (login, logout, password reset)
-- Client-side input validation and optimistic UI patterns for responsiveness
-- Build scripts for creating production bundles
+## 🚀 Getting Started
 
-Tech stack
-----------
-- Framework: Vite + React (or the chosen framework in the codebase)
-- Styling: TailwindCSS (configured in tailwind.config.js)
-- TypeScript configuration available (tsconfig.json)
-- Node.js / npm or yarn for package management
+### Prerequisites
 
-Repo layout
-----------
-- src/: application source
-  - components/: reusable UI components
-  - pages/: route-level components
-  - services/: API clients and app-level services
-  - hooks/: custom React hooks
-  - styles/: global styles and Tailwind config
-- index.html / main.tsx: SPA entrypoint
-- build.sh: convenience script for building
-- Dockerfile: container image definition
-- setup.sh: local setup helper
+- Node.js 16+ and npm/yarn
+- Backend API running on `http://localhost:8000`
 
-How it works (high level)
--------------------------
-- Single Page Application served as static assets (HTML/CSS/JS)
-- On login, the frontend obtains an auth token (or sets a session cookie) and uses it for API requests
-- Conversation UI sends user messages to the backend agent endpoint and displays streaming or final responses
-- State management is local (React context or other chosen state manager); ephemeral UI state is not stored on the backend unless user explicitly saves data
+### Installation
 
-Running locally
----------------
-Prerequisites
-- Node.js >= 18, npm/yarn
-- Backend running locally (see backend README) or a configured API endpoint
+1. **Install dependencies**
+   ```bash
+   npm install
+   ```
 
-Steps
-1. Install dependencies
-   - npm install
-2. Start dev server
-   - npm run dev
-   - By default Vite serves at http://localhost:5173 (configurable)
-3. Open browser and visit the dev URL
+2. **Configure environment variables**
+   ```bash
+   cp .env.example .env.local
+   ```
+   
+   Edit `.env.local`:
+   ```env
+   VITE_API_URL=http://localhost:8000
+   ```
 
-Environment variables
-- Use .env or .env.local for API_BASE_URL and feature flags
+3. **Start development server**
+   ```bash
+   npm run dev
+   ```
 
-Building for production
------------------------
-1. Build
-   - npm run build
-   - Output is created under the `dist/` folder
-2. Preview
-   - npm run preview (serves the production build locally)
+   The app will be available at `http://localhost:3000`
 
-Docker and deployment
----------------------
-- Build production image
-  - docker build -t financialed-frontend:latest -f frontend/Dockerfile .
-- Serve with a static web server (nginx) in production container
-- For static web hosting, upload `dist/` to S3, Azure Static Web Apps, or similar
+## 📁 Project Structure
 
-Integrating with the backend
-----------------------------
-- API_BASE_URL must point to the backend endpoint
-- If using cookies for auth, ensure same-site and secure cookie configuration match your deployment
-- For local dev, use proxy (vite config) to forward API requests to backend host/port
+```
+src/
+├── components/          # Reusable UI components
+│   ├── UI.jsx          # Core components (Card, Button, Input, etc.)
+│   ├── Layout.jsx      # Navigation and layout components
+│   └── ProtectedRoute.jsx
+├── pages/              # Page components
+│   ├── LoginPage.jsx
+│   ├── RegisterPage.jsx
+│   ├── DashboardPage.jsx
+│   ├── ExpensesPage.jsx
+│   ├── BudgetsPage.jsx
+│   ├── GoalsPage.jsx
+│   └── LoansPage.jsx
+├── hooks/              # Custom React hooks
+│   └── useAuth.js     # Authentication hooks
+├── services/           # API services
+│   ├── api.js         # Axios instance with interceptors
+│   └── apiService.js  # API endpoint wrappers
+├── store/              # State management (Zustand)
+│   ├── authStore.js
+│   └── index.js       # Feature stores
+├── utils/              # Utility functions
+│   ├── helpers.js     # Format and calculation helpers
+│   └── toast.js       # Toast notification utilities
+├── App.jsx            # Main app with routing
+├── main.jsx           # Entry point
+└── index.css          # Global styles
+```
 
-Testing
--------
-- Unit tests: use your chosen test runner (Vitest/Jest) and run npm test
-- E2E tests: Cypress / Playwright for flows like authentication and advisor conversation
+## 🎨 Theme & Design
 
-Accessibility and responsiveness
---------------------------------
-- Use semantic HTML and proper ARIA attributes on interactive components
-- Ensure keyboard navigability across the conversation UI and forms
-- Test across mobile breakpoints and use responsive design best practices (Tailwind utility classes)
+- **Color Palette**: Blue-based modern theme with gradients
+- **Typography**: System font stack for optimal rendering
+- **Animations**: Framer Motion for smooth transitions
+- **Component Library**: Custom component system following SOLID principles
 
-Performance and scaling guidance
---------------------------------
-- Keep client bundles small: split code by route and lazy-load heavy components
-- Use HTTP caching and long-lived cache headers for static assets
-- Use a CDN for distribution of static assets for low latency worldwide
-- Server-Side Rendering (SSR) or edge rendering can be considered if SEO or initial load is critical
+## 🔐 Authentication Flow
 
-Security considerations
-- Sanitize and validate user input
-- Do not store secrets or API keys in client code
-- Use HTTPS in production
-- Use Content Security Policy (CSP) to reduce XSS risks
+1. User registers or logs in
+2. Backend returns `access_token` and `refresh_token`
+3. Tokens stored in localStorage
+4. API interceptor adds token to all requests
+5. On token expiry, automatic refresh is attempted
+6. Failed refresh redirects to login
 
-Contribution guide
-------------------
-- Follow UI component patterns and the existing folder structure
-- Ensure unit tests for new components and pages
-- Run `npm test` and `npm run lint` before opening a PR
-- Keep UI changes backwards compatible where possible
+## 📊 State Management
 
-Interview guide / talking points
--------------------------------
-When explaining the frontend, cover:
-- Chosen framework, build tooling and rationale (Vite for fast dev)
-- How the conversation UI integrates with the backend agent (streaming vs final responses)
-- Performance strategies (code-splitting, caching, CDN)
-- How to add a new page: create route, page component, API service call, and wire tests
+Using Zustand for simplified, centralized state:
 
-Appendix
---------
-- Scripts: build.sh, setup.sh, test-integration.js
-- Useful files: index.html, tailwind.config.js, vite.config.js, tsconfig.json
+- **authStore**: User authentication state
+- **expenseStore**: Expense data and operations
+- **budgetStore**: Budget data and operations
+- **goalStore**: Financial goal data and operations
+- **loanStore**: Loan data and operations
+- **notificationStore**: User notifications
 
+## 🔌 API Integration
 
-Maintainers
-- Primary: project maintainers (see CODEOWNERS or repository settings)
+All API calls through `apiService.js`:
+- Centralized error handling
+- Token management
+- Request/response interceptors
+- Type-safe data structures
 
-License
-- See top-level LICENSE file (if present)
+## 🎯 Key Components
 
-Contact
-- For questions, open an issue or reach out to maintainers via repository channels.
+### UI Components
+- `Card`: Glassomorphism container
+- `Button`: Multi-variant button with states
+- `Input` & `Select`: Form controls with validation
+- `Modal`: Reusable dialog component
+- `StatCard`: Statistic display cards
+- `ProgressBar`: Visual progress indicator
+
+### Layout Components
+- `Sidebar`: Navigation with responsive behavior
+- `Header`: Top navigation with notifications
+- `Layout`: Main layout wrapper
+- `PageContainer`: Page header and content wrapper
+
+## 🚢 Building for Production
+
+```bash
+npm run build
+```
+
+Output goes to `dist/` folder. Can be served by any static server.
+
+## 📝 Development Guidelines
+
+### Code Structure
+- Components are functional React components
+- Props validation through JSDoc
+- Consistent error handling
+- Accessibility-first approach
+
+### Styling
+- Tailwind CSS for styling
+- Custom utility classes for common patterns
+- Responsive design with mobile-first approach
+
+### API Communication
+- Use store actions for data fetching
+- Handle loading and error states
+- Show user feedback with toast notifications
+
+## 🔄 Routing
+
+- `/login` - Public login page
+- `/register` - Public registration page
+- `/dashboard` - Protected dashboard
+- `/expenses` - Protected expenses management
+- `/budgets` - Protected budget planning
+- `/goals` - Protected financial goals
+- `/loans` - Protected loan tracking
+
+All protected routes require authentication.
+
+## 📱 Browser Support
+
+- Chrome (latest)
+- Firefox (latest)
+- Safari (latest)
+- Edge (latest)
+
+## 🐛 Troubleshooting
+
+### API Connection Issues
+- Ensure backend is running on `http://localhost:8000`
+- Check `VITE_API_URL` in `.env.local`
+- Verify CORS is properly configured on backend
+
+### Authentication Issues
+- Clear localStorage if tokens are invalid
+- Check browser console for error messages
+- Verify backend token endpoints
+
+### Build Issues
+- Delete `node_modules` and `dist`
+- Run `npm install` again
+- Check Node.js version (16+)
+
+## 📚 Dependencies
+
+- **react**: UI library
+- **react-router-dom**: Client-side routing
+- **axios**: HTTP client
+- **zustand**: State management
+- **framer-motion**: Animation library
+- **lucide-react**: Icon library
+- **react-hot-toast**: Toast notifications
+- **tailwindcss**: CSS framework
+
+## 📄 License
+
+MIT License - See LICENSE file
+
+## 🤝 Contributing
+
+1. Follow the code structure
+2. Use meaningful component and variable names
+3. Add JSDoc comments for complex functions
+4. Test on mobile devices
+5. Maintain responsive design
+
+## 📞 Support
+
+For issues or questions, please open an issue in the repository.

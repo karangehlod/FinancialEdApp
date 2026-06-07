@@ -13,20 +13,10 @@ from app.schemas.notification import (
 )
 from app.services.notification_service import NotificationService
 from app.core.logging import get_logger
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.db.session import get_data_db
-from fastapi import Request
 
 logger = get_logger(__name__)
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
-
-
-def get_notification_service(
-    session: AsyncSession = Depends(get_data_db),
-) -> NotificationService:
-    """Dependency factory — builds a NotificationService per request."""
-    return NotificationService(session)
 
 
 @router.get(
@@ -43,7 +33,7 @@ async def list_notifications(
     skip: int = Query(0, ge=0, description="Number of items to skip"),
     limit: int = Query(20, ge=1, le=100, description="Number of items to return"),
     current_user=Depends(get_current_user),
-    notification_service: NotificationService = Depends(get_notification_service),
+    session=Depends(get_data_db),
 ):
     """
     Get paginated list of notifications for the current user.
@@ -93,6 +83,7 @@ async def list_notifications(
     }
     ```
     """
+    notification_service = NotificationService(session)
 
     notifications, total = await notification_service.get_notifications(
         user_id=str(current_user.id),
@@ -121,7 +112,7 @@ async def list_notifications(
 async def get_notification(
     notification_id: str,
     current_user=Depends(get_current_user),
-    notification_service: NotificationService = Depends(get_notification_service),
+    session=Depends(get_data_db),
 ):
     """
     Get a specific notification by ID.
@@ -161,6 +152,7 @@ async def get_notification(
     }
     ```
     """
+    notification_service = NotificationService(session)
 
     try:
         notification = await notification_service.get_notification(
@@ -182,7 +174,7 @@ async def get_notification(
 async def mark_as_read(
     notification_id: str,
     current_user=Depends(get_current_user),
-    notification_service: NotificationService = Depends(get_notification_service),
+    session=Depends(get_data_db),
 ):
     """
     Mark a notification as read.
@@ -222,6 +214,7 @@ async def mark_as_read(
     }
     ```
     """
+    notification_service = NotificationService(session)
 
     try:
         notification = await notification_service.mark_as_read(
@@ -241,7 +234,7 @@ async def mark_as_read(
 )
 async def mark_all_as_read(
     current_user=Depends(get_current_user),
-    notification_service: NotificationService = Depends(get_notification_service),
+    session=Depends(get_data_db),
 ):
     """
     Mark all unread notifications as read.
@@ -262,6 +255,7 @@ async def mark_all_as_read(
     }
     ```
     """
+    notification_service = NotificationService(session)
 
     count = await notification_service.mark_all_as_read(user_id=str(current_user.id))
 
@@ -276,7 +270,7 @@ async def mark_all_as_read(
 async def delete_notification(
     notification_id: str,
     current_user=Depends(get_current_user),
-    notification_service: NotificationService = Depends(get_notification_service),
+    session=Depends(get_data_db),
 ):
     """
     Delete a notification.
@@ -307,6 +301,7 @@ async def delete_notification(
     }
     ```
     """
+    notification_service = NotificationService(session)
 
     try:
         await notification_service.delete_notification(
@@ -327,7 +322,7 @@ async def delete_notification(
 )
 async def get_notification_summary(
     current_user=Depends(get_current_user),
-    notification_service: NotificationService = Depends(get_notification_service),
+    session=Depends(get_data_db),
 ):
     """
     Get summary of notifications for the current user.
@@ -353,6 +348,7 @@ async def get_notification_summary(
     }
     ```
     """
+    notification_service = NotificationService(session)
 
     summary = await notification_service.get_notification_summary(
         user_id=str(current_user.id)
@@ -368,7 +364,7 @@ async def get_notification_summary(
 )
 async def get_unread_count(
     current_user=Depends(get_current_user),
-    notification_service: NotificationService = Depends(get_notification_service),
+    session=Depends(get_data_db),
 ):
     """
     Get count of unread notifications.
@@ -388,6 +384,7 @@ async def get_unread_count(
     }
     ```
     """
+    notification_service = NotificationService(session)
 
     count = await notification_service.get_unread_count(user_id=str(current_user.id))
 

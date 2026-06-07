@@ -59,21 +59,15 @@ class TestGoalCreate:
         assert "at least 1 character" in str(exc_info.value).lower()
     
     def test_invalid_goal_name_too_long(self):
-        """Test that a goal name > 255 chars is sanitized/truncated (not rejected).
-
-        The sanitize_name() validator runs before Pydantic's max_length check and
-        truncates the value to 150 chars, so no ValidationError is raised.
-        """
-        long_name = "a" * 256
+        """Test that goal name exceeding 255 chars is rejected."""
         data = {
-            "goal_name": long_name,
+            "goal_name": "a" * 256,
             "goal_type": "savings",
             "target_amount": Decimal("50000"),
             "target_date": date.today() + timedelta(days=365),
         }
-        goal = GoalCreate(**data)
-        # sanitize_name truncates to _MAX_NAME_LEN (150), well within max_length=255
-        assert len(goal.goal_name) <= 255
+        with pytest.raises(ValidationError):
+            GoalCreate(**data)
     
     def test_invalid_goal_type(self):
         """Test that invalid goal type is rejected."""

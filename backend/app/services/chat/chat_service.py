@@ -13,7 +13,6 @@ all request handlers.
 
 from __future__ import annotations
 
-import json
 import logging
 import uuid
 from typing import Optional
@@ -98,39 +97,9 @@ class ChatService:
                 logger.warning("Failed to build agent with model=%s: %s", model, exc)
                 agent = self._agent
 
-        # Verify ownership when a conversation_id was provided
-        if conversation_id is not None:
-            try:
-                user_convs = await self._store.list_user_conversations(user_id)
-                if conv_id not in user_convs:
-                    raise PermissionError("Conversation does not belong to user")
-            except PermissionError:
-                raise
-            except Exception:
-                # If we cannot verify membership due to store error, proceed but log
-                logger.warning("Could not verify conversation ownership for user %s", user_id)
-
         # Load message history from Redis / memory
         history = await self._store.get_history(conv_id)
         history.append(HumanMessage(content=message))
-
-        # Check for consent confirmation: if the last stored meta contains a pending_consent flag
-        try:
-            meta = await self._store.get_conversation_meta(conv_id)
-        except Exception:
-            meta = {}
-
-        consent_confirmed = False
-        if isinstance(message, str) and message.strip().lower() in ('yes', 'y', 'confirm'):
-            if meta.get('pending_consent'):
-                consent_confirmed = True
-                # clear the pending flag
-                try:
-                    meta.pop('pending_consent', None)
-                    await self._store._redis.set(f"chat:conv:{conv_id}:meta", json.dumps(meta), ex=86400)
-                except Exception:
-                    # best-effort; ignore if redis not available
-                    pass
 
         # Trim to max history
         max_msgs = settings.CHAT_MAX_HISTORY * 2  # each turn = 2 messages
@@ -141,7 +110,6 @@ class ChatService:
             result = await agent.ainvoke({
                 "messages": history,
                 "user_id": user_id,
-                "consent_confirmed": consent_confirmed,
             })
 
             # Extract the final AI message
@@ -169,86 +137,25 @@ class ChatService:
 
     async def create_conversation(self) -> dict:
         """Create a new conversation and return its ID."""
-        # Deprecated: use create_conversation_for_user where possible
         conv_id = str(uuid.uuid4())
         await self._store.save_history(conv_id, [])
-        return {"id": conv_id}
-
-    async def create_conversation_for_user(self, user_id: str) -> dict:
-        """Create a new conversation, persist empty history, and record ownership for a user."""
-        conv_id = str(uuid.uuid4())
-        await self._store.save_history(conv_id, [])
-        try:
-            await self._store.add_user_conversation(user_id, conv_id)
-        except Exception:
-            logger.warning("Failed to associate conv %s with user %s", conv_id, user_id)
         return {"id": conv_id}
 
     async def get_conversations(self, user_id: str) -> dict:
-        """List conversation IDs belonging to a specific user, including meta (title, last message, timestamp)."""
-        conv_ids = await self._store.list_user_conversations(user_id)
-        conversations = []
-        for cid in conv_ids:
-            try:
-                meta = await self._store.get_conversation_meta(cid)
-            except Exception:
-                logger.warning("Failed to load meta for conv %s", cid)
-                meta = {}
-            conversations.append({
-                "id": cid,
-                "title": meta.get("title"),
-                "last": meta.get("last"),
-                "ts": meta.get("ts"),
-            })
-        return {"conversations": conversations}
+        """List conversation IDs."""
+        conv_ids = await self._store.list_conversations()
+        return {"conversations": conv_ids}
 
-    async def get_history(self, conversation_id: str, user_id: Optional[str] = None) -> dict:
-        """Return messages in a conversation.
-
-        If user_id is provided, verify the conversation belongs to the user.
-        """
-        if user_id is not None:
-            try:
-                user_convs = await self._store.list_user_conversations(user_id)
-                if conversation_id not in user_convs:
-                    raise PermissionError("Conversation does not belong to user")
-            except PermissionError:
-                raise
-            except Exception:
-                logger.warning("Could not verify conversation ownership for user %s", user_id)
-
+    async def get_history(self, conversation_id: str) -> dict:
+        """Return messages in a conversation."""
         history = await self._store.get_history(conversation_id)
         messages = []
         for m in history:
-            ts = None
-            # preserve stored timestamp if present (could be ISO string)
-            try:
-                ts = getattr(m, 'timestamp', None)
-            except Exception:
-                ts = None
             if isinstance(m, HumanMessage):
-                messages.append({"role": "user", "content": m.content, "timestamp": ts})
+                messages.append({"role": "user", "content": m.content})
             elif isinstance(m, AIMessage):
-                messages.append({"role": "assistant", "content": m.content, "timestamp": ts})
+                messages.append({"role": "assistant", "content": m.content})
         return {"messages": messages, "conversation_id": conversation_id}
-
-    async def delete_conversation(self, conversation_id: str, user_id: Optional[str] = None) -> None:
-        """Delete a conversation and remove association with a user.
-
-        If user_id is provided, enforce ownership.
-        """
-        if user_id is not None:
-            user_convs = await self._store.list_user_conversations(user_id)
-            if conversation_id not in user_convs:
-                raise PermissionError("Conversation does not belong to user")
-
-        # Remove conversation data and associations (best-effort)
-        await self._store.delete_conversation(conversation_id)
-        if user_id is not None:
-            try:
-                await self._store.remove_user_conversation(user_id, conversation_id)
-            except Exception:
-                logger.warning("Failed to remove conversation %s from user %s set", conversation_id, user_id)
 
     # ------------------------------------------------------------------
     # Fallback when LLM is not configured

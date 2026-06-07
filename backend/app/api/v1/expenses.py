@@ -1,5 +1,5 @@
 """Expense management endpoints."""
-from fastapi import APIRouter, Depends, Query, status, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, Query, status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import and_, select, func
 from typing import Optional
@@ -21,16 +21,6 @@ from app.schemas.expense import (
 from app.services.expense_service import ExpenseService
 from app.core.exceptions import ExpenseNotFoundError, DatabaseError
 from app.core.logging import get_logger
-from app.core.cache import compute_etag, set_metadata, bump_version
-from app.core.validation_decorators import validate_expense_input, sanitize_request_fields
-from app.core.error_handling_decorators import (
-    log_operation,
-    audit_log,
-    handle_db_errors,
-    handle_not_found_errors,
-)
-from app.core.rate_limiting_decorators import rate_limit, apply_preset_limit
-from app.config import settings
 
 logger = get_logger(__name__)
 
@@ -38,28 +28,11 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/expenses", tags=["Expenses"])
 
 
-def get_expense_service(
-    request: Request,
-    db: AsyncSession = Depends(get_data_db),
-) -> ExpenseService:
-    """Dependency factory — builds an ExpenseService per request."""
-    cache_service = getattr(request.app.state, "cache_service", None) if request else None
-    return ExpenseService(db, cache_service=cache_service)
-
-
 @router.post("", response_model=ExpenseResponse, status_code=status.HTTP_201_CREATED)
-@apply_preset_limit("create")
-@validate_expense_input
-@sanitize_request_fields(['description'], sanitizer_type='text')
-@log_operation("create_expense", include_args=False, include_result=False)
-@audit_log(action="create", resource_type="expense")
-@handle_db_errors(rollback_on_error=True)
 async def create_expense(
     expense_data: ExpenseCreate,
     current_user: User = Depends(get_current_user),
-    request: Request = None,
-    response: Response = None,
-    service: ExpenseService = Depends(get_expense_service),
+    db: AsyncSession = Depends(get_data_db)
 ):
     """
     Create a new expense for the authenticated user.
@@ -69,16 +42,8 @@ async def create_expense(
     - **date**: Date of expense
     - **description**: Optional description
     """
+    service = ExpenseService(db)
     expense = await service.create_expense(current_user.id, expense_data)
-
-    try:
-        redis_client = getattr(request.app.state, "redis_client", None) if request else None
-        if redis_client:
-            logical_key = f"{request.url.path}/{expense.id}" if request else f"/api/v1/expenses/{expense.id}"
-            await bump_version(redis_client, "expenses", logical_key)
-    except Exception:
-        pass
-
     return expense
 
 
@@ -89,9 +54,10 @@ async def get_expense_summary(
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
     current_user: User = Depends(get_current_user),
-    service: ExpenseService = Depends(get_expense_service),
+    db: AsyncSession = Depends(get_data_db)
 ):
     """Get summary of expenses for the authenticated user."""
+    service = ExpenseService(db)
     summary = await service.get_expense_summary(
         current_user.id, start_date=start_date, end_date=end_date
     )
@@ -205,22 +171,30 @@ async def get_expense_trends(
 
 @router.get("", response_model=ExpenseListResponse)
 async def list_expenses(
-    skip: int = Query(0, ge=0, description="Number of records to skip"),
-    limit: int = Query(50, ge=1, le=500, description="Max records to return (hard cap: 500)"),
-    category: Optional[str] = Query(None, max_length=50),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+    category: Optional[str] = Query(None),
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
-    min_amount: Optional[float] = Query(None, ge=0),
-    max_amount: Optional[float] = Query(None, ge=0),
-    merchant: Optional[str] = Query(None, max_length=200),
-    payment_method: Optional[str] = Query(None, max_length=50),
+    min_amount: Optional[float] = Query(None),
+    max_amount: Optional[float] = Query(None),
+    merchant: Optional[str] = Query(None),
+    payment_method: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user),
-    request: Request = None,
-    response: Response = None,
-    service: ExpenseService = Depends(get_expense_service),
+    db: AsyncSession = Depends(get_data_db)
 ):
     """
     Get list of expenses for authenticated user with filters.
+    
+    - **skip**: Number of records to skip (pagination)
+    - **limit**: Maximum number of records to return
+    - **category**: Filter by category (optional)
+    - **start_date**: Filter expenses from this date (optional)
+    - **end_date**: Filter expenses until this date (optional)
+    - **min_amount**: Filter expenses above this amount (optional)
+    - **max_amount**: Filter expenses below this amount (optional)
+    - **merchant**: Filter by merchant name (optional)
+    - **payment_method**: Filter by payment method (optional)
     """
     from app.schemas.expense import ExpenseFilter
     
@@ -234,6 +208,7 @@ async def list_expenses(
         payment_method=payment_method
     )
     
+    service = ExpenseService(db)
     expenses, total = await service.get_user_expenses(
         current_user.id, skip, limit, filters
     )
@@ -245,56 +220,57 @@ async def list_expenses(
 async def get_expense(
     expense_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
-    service: ExpenseService = Depends(get_expense_service),
+    db: AsyncSession = Depends(get_data_db)
 ):
-    """Get a specific expense by ID."""
+    """Get a specific expense by ID.
+    
+    **Path Parameters:**
+    - **expense_id**: Expense UUID
+    
+    **Returns:** Expense details
+    
+    **Errors:**
+    - **EXP_001**: Expense not found
+    """
     logger.debug(
         "Get expense request",
         extra={"expense_id": str(expense_id), "user_id": str(current_user.id)}
     )
+    service = ExpenseService(db)
     expense = await service.get_expense(expense_id, current_user.id)
     return expense
 
 
 @router.put("/{expense_id}", response_model=ExpenseResponse)
-@apply_preset_limit("update")
-@validate_expense_input
-@sanitize_request_fields(['description'], sanitizer_type='text')
-@log_operation("update_expense", include_args=False, include_result=False)
-@audit_log(action="update", resource_type="expense")
-@handle_db_errors(rollback_on_error=True)
 async def update_expense(
     expense_id: uuid.UUID,
     expense_data: ExpenseUpdate,
     current_user: User = Depends(get_current_user),
-    request: Request = None,
-    response: Response = None,
-    service: ExpenseService = Depends(get_expense_service),
+    db: AsyncSession = Depends(get_data_db)
 ):
-    """Update an expense. Only provided fields will be updated."""
+    """Update an expense. Only provided fields will be updated.
+    
+    **Path Parameters:**
+    - **expense_id**: Expense UUID
+    
+    **Request body:**
+    - Any expense fields to update (amount, category, date, description, etc.)
+    
+    **Returns:** Updated expense
+    
+    **Errors:**
+    - **EXP_001**: Expense not found
+    """
     try:
         logger.info(
             "Update expense request",
             extra={"expense_id": str(expense_id), "user_id": str(current_user.id), "data": str(expense_data)}
         )
+        service = ExpenseService(db)
         expense = await service.update_expense(
             expense_id, current_user.id, expense_data
         )
-
-        try:
-            redis_client = getattr(request.app.state, "redis_client", None) if request else None
-            logical_key = request.url.path if request else f"/api/v1/expenses/{expense_id}"
-            if redis_client:
-                await bump_version(redis_client, "expenses", logical_key)
-        except Exception:
-            pass
-
         return expense
-    except ExpenseNotFoundError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Expense {expense_id} not found"
-        )
     except Exception as e:
         logger.error(f"Update expense error: {str(e)}", extra={"expense_id": str(expense_id)})
         raise HTTPException(
@@ -304,30 +280,26 @@ async def update_expense(
 
 
 @router.delete("/{expense_id}", status_code=status.HTTP_204_NO_CONTENT)
-@apply_preset_limit("delete")
-@log_operation("delete_expense")
-@audit_log(action="delete", resource_type="expense")
-@handle_db_errors(rollback_on_error=True)
 async def delete_expense(
     expense_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
-    request: Request = None,
-    service: ExpenseService = Depends(get_expense_service),
+    db: AsyncSession = Depends(get_data_db)
 ):
-    """Delete an expense."""
+    """Delete an expense.
+    
+    **Path Parameters:**
+    - **expense_id**: Expense UUID
+    
+    **Returns:** No content (204)
+    
+    **Errors:**
+    - **EXP_001**: Expense not found
+    """
     logger.info(
         "Delete expense request",
         extra={"expense_id": str(expense_id), "user_id": str(current_user.id)}
     )
+    service = ExpenseService(db)
     success = await service.delete_expense(expense_id, current_user.id)
-
-    try:
-        redis_client = getattr(request.app.state, "redis_client", None) if request else None
-        logical_key = request.url.path if request else f"/api/v1/expenses/{expense_id}"
-        if redis_client:
-            await bump_version(redis_client, "expenses", logical_key)
-    except Exception:
-        pass
-
     return None
 

@@ -35,7 +35,7 @@ SEED_USERS = [
 
 async def seed():
     from app.db.session import AuthSessionLocal, DataSessionLocal
-    from app.core.security_compat import hash_password
+    from app.core.security import hash_password
     from sqlalchemy import text
 
     for user_data in SEED_USERS:

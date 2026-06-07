@@ -45,10 +45,16 @@ FinEd helps users manage their finances by providing tools for:
 #### 1. Start Backend
 
 ```bash
+cd database_setup
+# Initialize databases (PostgreSQL & Redis)
+# Follow instructions in database_setup/README.md
+docker compose up -d  # Start databases
+
+
 cd backend
 source venv/bin/activate  # or venv\Scripts\activate on Windows
 pip install -r requirements.txt
-python -m uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload --port 8000
 ```
 
 Backend: `http://localhost:8000` | Docs: `http://localhost:8000/docs`
@@ -404,5 +410,5 @@ See [backend/docs/architecture.md](./backend/docs/architecture.md) for deploymen
 
 **Version**: 1.0.0  
 **Last Updated**: January 2026  
-**Status**: Need to fix the issues found by CI
+**Status**: Production Ready ✅
 

@@ -46,14 +46,13 @@ class TestExportExpenses:
         assert response.status_code in [200, 401, 403, 400]
     
     def test_export_expenses_missing_dates(self, client):
-        """Test exporting expenses without date filters — API allows this (returns all or empty)."""
+        """Test exporting expenses without required dates."""
         response = client.post(
             "/api/v1/exports/expenses/csv",
             json={},
             headers={"Authorization": "Bearer invalid_token"}
         )
-        # Dates are optional; API returns 200 with empty CSV or 401 if unauthenticated
-        assert response.status_code in [200, 400, 401, 403, 422]
+        assert response.status_code in [400, 401, 403, 422]
 
 
 class TestExportBudgets:

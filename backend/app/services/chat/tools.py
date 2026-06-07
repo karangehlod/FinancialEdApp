@@ -9,7 +9,7 @@ user_id from the graph state (injected at runtime, never exposed to the LLM).
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Optional
 from uuid import UUID
 
@@ -44,7 +44,7 @@ async def get_expense_summary(user_id: str, months: int = 3) -> str:
 
     session = await _get_data_session()
     try:
-        cutoff = datetime.now(timezone.utc) - timedelta(days=months * 30)
+        cutoff = datetime.utcnow() - timedelta(days=months * 30)
         uid = UUID(user_id)
 
         result = await session.execute(

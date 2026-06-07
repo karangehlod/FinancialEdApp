@@ -10,9 +10,7 @@ import {
   EmptyState,
   Modal,
   ProgressBar,
-  FluidIcon,
 } from '../components/UI'
-import { FluidGrid } from '../components/FluidGrid'
 import { useGoalStore } from '../store/index'
 import { GoalAllocationStrategy } from '../components/goals/GoalAllocationStrategy'
 import { motion } from 'framer-motion'
@@ -172,6 +170,7 @@ export const GoalsPage = () => {
         title="Financial Goals"
         subtitle="Set and track your savings goals"
         icon={Target}
+        iconSize={'var(--page-icon-size)'}
         iconAlt="Goals"
         action={
           <div className="flex gap-3">
@@ -183,7 +182,7 @@ export const GoalsPage = () => {
               variant="primary"
               className="gap-2"
             >
-              <FluidIcon icon={Plus} size="sm" />
+              <Plus size={20} />
               New Goal
             </Button>
             <Button
@@ -191,28 +190,26 @@ export const GoalsPage = () => {
               variant="secondary"
               className="gap-2"
             >
-              <FluidIcon icon={Zap} size="sm" />
+              <Zap size={20} />
               Allocation Strategy
             </Button>
           </div>
         }
       >
         {/* Stats */}
-        <motion.div className="mb-8">
-          <FluidGrid min="220px">
-            <Card>
-              <p className="text-sm-fluid text-gray-600 dark:text-gray-400 font-medium">Active Goals</p>
-              <p className="text-stat text-primary-600 dark:text-primary-400 mt-2">{activeGoals}</p>
-            </Card>
-            <Card>
-              <p className="text-sm-fluid text-gray-600 dark:text-gray-400 font-medium">Completed Goals</p>
-              <p className="text-stat text-green-600 dark:text-green-400 mt-2">{completedGoals}</p>
-            </Card>
-            <Card>
-              <p className="text-sm-fluid text-gray-600 dark:text-gray-400 font-medium">Total Goals</p>
-              <p className="text-stat text-secondary-600 dark:text-secondary-400 mt-2">{goals.length}</p>
-            </Card>
-          </FluidGrid>
+        <motion.div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Card>
+            <p className="text-gray-600 dark:text-gray-400 text-sm font-medium">Active Goals</p>
+            <p className="text-3xl font-bold text-primary-600 dark:text-primary-400 mt-2">{activeGoals}</p>
+          </Card>
+          <Card>
+            <p className="text-gray-600 dark:text-gray-400 text-sm font-medium">Completed Goals</p>
+            <p className="text-3xl font-bold text-green-600 dark:text-green-400 mt-2">{completedGoals}</p>
+          </Card>
+          <Card>
+            <p className="text-gray-600 dark:text-gray-400 text-sm font-medium">Total Goals</p>
+            <p className="text-3xl font-bold text-secondary-600 dark:text-secondary-400 mt-2">{goals.length}</p>
+          </Card>
         </motion.div>
 
         {/* Goals List */}
@@ -248,43 +245,43 @@ export const GoalsPage = () => {
                       <div className="flex-1">
                         <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">{goal.goal_name}</h3>
                         {goal.description && (
-                          <p className="text-sm-fluid text-gray-600 dark:text-gray-400 mt-1">{goal.description}</p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{goal.description}</p>
                         )}
-                        <p className="text-sm-fluid text-gray-500 dark:text-gray-400 mt-2">
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
                           {formatCurrency(goal.current_amount)} / {formatCurrency(goal.target_amount)}
                         </p>
                       </div>
-                      <div className="flex gap-2 flex-shrink-0 items-center">
+                      <div className="flex gap-2 flex-shrink-0">
                         {goal.status !== 'completed' && (
-                          <Button
-                            size="sm"
-                            variant="secondary"
+                          <motion.button
                             onClick={() => {
                               setProgressGoalId(goal.id)
                               setIsProgressModalOpen(true)
                             }}
-                            className="bg-green-100 text-green-700 hover:bg-green-200 gap-2"
-                          >
-                            Add Progress
-                          </Button>
-                        )}
-                        {goal.status !== 'completed' && (
-                          <motion.button
-                            onClick={() => handleEdit(goal)}
-                            className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-lg hover:bg-blue-50 text-blue-600"
+                            className="px-3 py-2 bg-green-100 text-green-700 rounded-lg text-sm font-medium hover:bg-green-200"
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                           >
-                            <FluidIcon icon={Edit2} size="sm" />
+                            Add Progress
+                          </motion.button>
+                        )}
+                        {!goal.completed && (
+                          <motion.button
+                            onClick={() => handleEdit(goal)}
+                            className="p-2 hover:bg-blue-50 rounded-lg text-blue-600"
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.95 }}
+                          >
+                            <Edit2 size={18} />
                           </motion.button>
                         )}
                         <motion.button
                           onClick={() => handleDelete(goal.id)}
-                          className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-lg hover:bg-red-50 text-red-600"
-                          whileHover={{ scale: 1.05 }}
+                          className="p-2 hover:bg-red-50 rounded-lg text-red-600"
+                          whileHover={{ scale: 1.1 }}
                           whileTap={{ scale: 0.95 }}
                         >
-                          <FluidIcon icon={Trash2} size="sm" />
+                          <Trash2 size={18} />
                         </motion.button>
                       </div>
                     </div>
@@ -343,7 +340,7 @@ export const GoalsPage = () => {
           />
 
           <div className="space-y-2">
-            <label className="block text-sm-fluid font-medium text-gray-700 dark:text-gray-300">Goal Type</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Goal Type</label>
             <select
               value={formData.goal_type}
               onChange={(e) => {
@@ -358,7 +355,7 @@ export const GoalsPage = () => {
               <option value="emergency_fund">Emergency Fund</option>
               <option value="other">Other</option>
             </select>
-            {formErrors.goal_type && <p className="text-sm-fluid text-red-600">{formErrors.goal_type}</p>}
+            {formErrors.goal_type && <p className="text-sm text-red-600">{formErrors.goal_type}</p>}
           </div>
 
           <Input
@@ -394,7 +391,7 @@ export const GoalsPage = () => {
           />
 
           <div className="space-y-2">
-            <label className="block text-sm-fluid font-medium text-gray-700 dark:text-gray-300">Priority</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Priority</label>
             <select
               value={formData.priority}
               onChange={(e) => setFormData({ ...formData, priority: e.target.value })}

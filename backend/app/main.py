@@ -35,11 +35,9 @@ from app.core.error_handlers import (
 from app.core.middleware import (
     HTTPSEnforcementMiddleware,
     RateLimitMiddleware,
-    ConditionalGetMiddleware,
 )
 from app.core.metrics import MetricsMiddleware, get_metrics_endpoint
 from app.core.etag_middleware import ETagMiddleware
-from app.core.request_size_middleware import RequestSizeLimitMiddleware
 
 # ---------------------------------------------------------------------------
 # Logging — initialise before anything else
@@ -64,11 +62,7 @@ from app.api.v1.websocket import router as websocket_router      # P2-4: WebSock
 from app.api.v1.gdpr import router as gdpr_router                # P2-5: GDPR compliance
 from app.api.v1.oauth import router as oauth_router              # P2-6: OAuth / Social Login
 from app.api.v1.admin import router as admin_router              # P2-8: Admin dashboard
-try:
-    from app.api.v1.chat import router as chat_router                # P3-1: AI Chat
-except ImportError:
-    chat_router = None
-    logger.warning("Chat router import failed (langchain not installed) — AI Chat feature disabled")
+from app.api.v1.chat import router as chat_router                # P3-1: AI Chat
 
 # ---------------------------------------------------------------------------
 # Model imports — ensures SQLAlchemy registers all table metadata
@@ -147,46 +141,19 @@ async def lifespan(app: FastAPI):
         redis_cache = RedisCache(redis_client)
         app.state.redis_client = redis_client
         app.state.redis_cache = redis_cache
-        # Provide a unified cache attribute expected by some services: prefer the provider
-        # (RedisCache) but ensure a cache_service is also available for higher-level APIs.
-        app.state.cache = redis_cache
         app.state.cache_service = CacheService(redis_cache)
         app.state.rate_limiter = RedisRateLimiter(redis_client)
         logger.info("Redis initialised successfully")
-        # NOTE: Rate limiting is handled via @app.middleware("http") below
-        # because add_middleware() cannot be called after the ASGI app starts.
-        logger.info("Rate limiter ready (applied via HTTP middleware hook)")
     except Exception as exc:
-        logger.error(f"Redis unavailable ({exc}) — cache and rate limiting disabled")
+        logger.error("Redis unavailable (%s) — cache and rate limiting disabled", exc)
         app.state.redis_client = None
         app.state.redis_cache = None
-        # Fallback: expose a cache attribute that points to the NullCacheService so
-        # callers using `app.state.cache` still get a callable cache-like object.
         app.state.cache_service = NullCacheService()
-        app.state.cache = app.state.cache_service
         app.state.rate_limiter = None
 
     # Expose cache to the dependencies module (backward compat)
     from app.dependencies import set_redis_cache
-    # Prefer the unified `app.state.cache` when registering with dependencies.
-    await set_redis_cache(app.state.cache if hasattr(app.state, 'cache') else app.state.redis_cache)
-
-    # ------------------------------------------------------------------
-    # Domain Services — session factories stored on app.state
-    # (P0-8: services are injected per-request via Depends() in endpoints;
-    #  no need to pre-instantiate here — just verify imports are healthy)
-    # ------------------------------------------------------------------
-    try:
-        from app.services.budget_service import BudgetService, FinancialProfileService  # noqa: F401
-        from app.services.expense_service import ExpenseService  # noqa: F401
-        from app.services.loan_service import LoanService  # noqa: F401
-        from app.services.goal_service import GoalService  # noqa: F401
-        from app.services.notification_service import NotificationService  # noqa: F401
-        from app.db.session import DataSessionLocal
-        app.state.data_session_factory = DataSessionLocal
-        logger.info("Domain service modules loaded successfully")
-    except Exception as exc:
-        logger.error(f"Domain services module load failed: {exc}", exc_info=True)
+    await set_redis_cache(app.state.redis_cache)
 
     # ------------------------------------------------------------------
     # Chat service — initialise with Redis for multi-worker history
@@ -194,11 +161,14 @@ async def lifespan(app: FastAPI):
     try:
         from app.services.chat.chat_service import init_chat_service
         chat_svc = init_chat_service(redis_client=app.state.redis_client)
-        agent_status = "ready" if chat_svc.is_available else "unavailable"
-        redis_status = "yes" if app.state.redis_client else "no (in-memory fallback)"
-        logger.info(f"ChatService initialised (agent={agent_status}, redis={redis_status})")
+        logger.info(
+            "ChatService initialised (agent=%s, redis=%s)",
+            "ready" if chat_svc.is_available else "unavailable",
+            "yes" if app.state.redis_client else "no (in-memory fallback)",
+        )
     except Exception as exc:
-        logger.error(f"ChatService setup failed: {exc}")
+        logger.error("ChatService setup failed: %s", exc)
+        # logger.warning("ChatService setup failed (non-fatal): %s", exc)
 
     # ------------------------------------------------------------------
     # OpenTelemetry — P1-4: distributed tracing + auto-instrumentation
@@ -208,7 +178,7 @@ async def lifespan(app: FastAPI):
         setup_telemetry(app)
         logger.info("OpenTelemetry tracing initialised")
     except Exception as exc:
-        logger.warning(f"OpenTelemetry setup failed (non-fatal): {exc}")
+        logger.warning("OpenTelemetry setup failed (non-fatal): %s", exc)
 
     # ------------------------------------------------------------------
     # Multi-currency service — P2-7
@@ -220,7 +190,7 @@ async def lifespan(app: FastAPI):
         )
         logger.info("Currency service initialised")
     except Exception as exc:
-        logger.warning(f"Currency service setup failed (non-fatal): {exc}")
+        logger.warning("Currency service setup failed (non-fatal): %s", exc)
         app.state.currency_service = None
 
     # ------------------------------------------------------------------
@@ -236,14 +206,7 @@ async def lifespan(app: FastAPI):
                 app.state.pubsub_manager = pubsub_manager
                 logger.info("WebSocket Pub/Sub manager started")
         except Exception as exc:
-            logger.warning(f"WebSocket Pub/Sub setup failed (non-fatal): {exc}")
-
-    # Log DB pool strategy for observability and smoke tests
-    try:
-        from app.db.session import log_effective_pool_strategy
-        log_effective_pool_strategy()
-    except Exception as exc:
-        logger.warning(f"Failed to log DB pool strategy: {exc}")
+            logger.warning("WebSocket Pub/Sub setup failed (non-fatal): %s", exc)
 
     logger.info("=== Application ready to serve requests ===")
 
@@ -256,19 +219,6 @@ async def lifespan(app: FastAPI):
     # Shutdown — graceful cleanup
     # ------------------------------------------------------------------
     logger.info("=== Application shutdown: cleaning up resources ===")
-
-    # Flush and shut down OpenTelemetry before closing other resources
-    # to prevent "I/O operation on closed file" errors from the span exporter.
-    try:
-        from opentelemetry import trace
-        provider = trace.get_tracer_provider()
-        if hasattr(provider, "force_flush"):
-            provider.force_flush(timeout_millis=5000)
-        if hasattr(provider, "shutdown"):
-            provider.shutdown()
-        logger.info("OpenTelemetry tracer provider shut down")
-    except Exception as exc:
-        logger.debug("OpenTelemetry shutdown (non-fatal): %s", exc)
 
     # Stop WebSocket Pub/Sub manager
     if pubsub_manager:
@@ -339,10 +289,6 @@ if settings.ENVIRONMENT == "production":
 
 # 3. ETag / conditional GET — P1-1
 app.add_middleware(ETagMiddleware, enabled=True)
-
-# 3b. Conditional GET middleware checks Redis-stored metadata (ETag, Last-Modified)
-# and may short-circuit GET requests with 304 responses when appropriate.
-app.add_middleware(ConditionalGetMiddleware)
 
 
 # ---------------------------------------------------------------------------
@@ -446,106 +392,22 @@ async def request_logging_middleware(request: Request, call_next):
     return response
 
 
-# Register request size limiter (protects against large payloads)
-try:
-    max_body = int(getattr(settings, "MAX_REQUEST_BODY", 1024 * 1024))
-except Exception:
-    max_body = 1024 * 1024
-app.add_middleware(RequestSizeLimitMiddleware, max_body=max_body)
-
-
-# Rate limiting middleware — registered as an HTTP middleware hook so it can
-# use the rate_limiter initialised during lifespan startup (app.state).
-# This replaces the broken app.add_middleware() approach which cannot be
-# called after the ASGI app has started serving requests.
-
-_RATE_LIMIT_EXCLUDE = frozenset(["/health", "/metrics", "/docs", "/redoc", "/openapi.json"])
-
-
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
-    """Enforce per-route rate limits using the Redis sliding-window limiter."""
+    """
+    Apply per-route rate limiting using the Redis sliding-window limiter.
+
+    The rate_limiter is stored on app.state during lifespan startup.
+    If Redis is unavailable, the limiter is None and requests pass through.
+    """
     rate_limiter = getattr(request.app.state, "rate_limiter", None)
     if rate_limiter is None:
         # Redis unavailable — fail open
         return await call_next(request)
 
-    path = request.url.path
-    if any(path.startswith(p) for p in _RATE_LIMIT_EXCLUDE):
-        return await call_next(request)
-
-    try:
-        from app.core.rate_limiting import rate_limit_config
-        from app.core.middleware import _extract_client_ip
-
-        # Determine identifier: JWT sub for authenticated, IP for unauthenticated
-        identifier, authenticated = _get_rate_limit_identifier(request)
-        rule = rate_limit_config.get_rule(path, authenticated=authenticated)
-        scoped_key = f"{rule.group}:{identifier}"
-
-        allowed, current_count = await rate_limiter.check_and_increment(
-            scoped_key, rule.limit, rule.window
-        )
-        remaining = max(0, rule.limit - current_count)
-
-        if not allowed:
-            from fastapi.responses import JSONResponse
-            from fastapi import status as http_status
-            return JSONResponse(
-                status_code=http_status.HTTP_429_TOO_MANY_REQUESTS,
-                content={
-                    "success": False,
-                    "error": {
-                        "code": "SRV_003",
-                        "message": "Too many requests. Please slow down.",
-                        "details": {
-                            "limit": rule.limit,
-                            "window_seconds": rule.window,
-                            "retry_after": rule.window,
-                        },
-                    },
-                },
-                headers={
-                    "Retry-After": str(rule.window),
-                    "X-RateLimit-Limit": str(rule.limit),
-                    "X-RateLimit-Remaining": "0",
-                    "X-RateLimit-Reset": str(rule.window),
-                },
-            )
-
-        response = await call_next(request)
-        response.headers["X-RateLimit-Limit"] = str(rule.limit)
-        response.headers["X-RateLimit-Remaining"] = str(remaining)
-        response.headers["X-RateLimit-Reset"] = str(rule.window)
-        return response
-    except Exception as exc:
-        # Fail open — never block a request because of a rate-limiter bug
-        logger.warning("Rate limiter error (failing open): %s", exc)
-        return await call_next(request)
-
-
-def _get_rate_limit_identifier(request: Request) -> tuple:
-    """Extract rate-limit identifier from request (user ID or client IP)."""
-    import base64 as _b64
-    import json as _json
-
-    auth_header = request.headers.get("Authorization", "")
-    if auth_header.startswith("Bearer "):
-        token = auth_header[len("Bearer "):]
-        try:
-            payload_b64 = token.split(".")[1]
-            padding = 4 - len(payload_b64) % 4
-            padded = payload_b64 + "=" * (padding % 4)
-            payload = _json.loads(_b64.urlsafe_b64decode(padded))
-            sub = payload.get("sub")
-            if sub:
-                return f"user:{sub}", True
-        except Exception:
-            pass
-
-    from app.core.middleware import _extract_client_ip
-    ip = _extract_client_ip(request)
-    return f"ip:{ip}", False
+    # Delegate to the proper middleware class
+    middleware = RateLimitMiddleware(app=None, rate_limiter=rate_limiter)
+    return await middleware(request, call_next)
 
 
 # ---------------------------------------------------------------------------
@@ -564,8 +426,7 @@ app.include_router(two_factor_router,    prefix=settings.API_V1_PREFIX)   # P2-3
 app.include_router(gdpr_router,          prefix=settings.API_V1_PREFIX)   # P2-5
 app.include_router(oauth_router,         prefix=settings.API_V1_PREFIX)   # P2-6
 app.include_router(admin_router,         prefix=settings.API_V1_PREFIX)   # P2-8
-if chat_router:
-    app.include_router(chat_router,          prefix=settings.API_V1_PREFIX)   # P3-1
+app.include_router(chat_router,          prefix=settings.API_V1_PREFIX)   # P3-1
 # WebSocket router mounts at root level (no API version prefix)
 app.include_router(websocket_router)                                       # P2-4
 

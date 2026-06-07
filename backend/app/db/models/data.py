@@ -3,24 +3,6 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql import func
 from app.db.session import DataBase
 import uuid
-from datetime import datetime, timezone
-
-
-# P1-7: Soft delete mixin — allows deletion tracking without losing data
-class SoftDeleteMixin:
-    """Mixin that adds soft-delete capability to any model."""
-    is_deleted = Column(Boolean, default=False, nullable=False, index=True)
-    deleted_at = Column(DateTime(timezone=True), nullable=True)
-
-    def soft_delete(self):
-        """Mark the record as deleted without removing it from the database."""
-        self.is_deleted = True
-        self.deleted_at = datetime.now(timezone.utc)
-
-    def restore(self):
-        """Restore a soft-deleted record."""
-        self.is_deleted = False
-        self.deleted_at = None
 
 
 class UserProfile(DataBase):
@@ -53,20 +35,7 @@ class Expense(DataBase):
     merchant = Column(String(255))
     payment_method = Column(String(50))
     is_recurring = Column(Boolean, default=False)
-    # P1-7: Soft delete columns
-    is_deleted = Column(Boolean, default=False, nullable=False, index=True)
-    deleted_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=False), server_default=func.now())
-    
-    def soft_delete(self):
-        """Mark the expense as deleted without removing it from the database."""
-        self.is_deleted = True
-        self.deleted_at = datetime.now(timezone.utc)
-    
-    def restore(self):
-        """Restore a soft-deleted expense."""
-        self.is_deleted = False
-        self.deleted_at = None
 
 
 class Budget(DataBase):
@@ -79,20 +48,7 @@ class Budget(DataBase):
     allocated_amount = Column(Numeric(15, 2))
     spent_amount = Column(Numeric(15, 2), default=0)
     recommended_amount = Column(Numeric(15, 2))
-    # P1-7: Soft delete columns
-    is_deleted = Column(Boolean, default=False, nullable=False, index=True)
-    deleted_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=False), server_default=func.now())
-    
-    def soft_delete(self):
-        """Mark the budget as deleted without removing it from the database."""
-        self.is_deleted = True
-        self.deleted_at = datetime.now(timezone.utc)
-    
-    def restore(self):
-        """Restore a soft-deleted budget."""
-        self.is_deleted = False
-        self.deleted_at = None
 
 
 class UserFinancialProfile(DataBase):
@@ -173,21 +129,8 @@ class Goal(DataBase):
     description = Column(Text)
     priority = Column(String(20), default='medium')  # high, medium, low
     status = Column(String(20), default='active')  # active, completed, paused, abandoned
-    # P1-7: Soft delete columns
-    is_deleted = Column(Boolean, default=False, nullable=False, index=True)
-    deleted_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=False), server_default=func.now())
     updated_at = Column(DateTime(timezone=False), server_default=func.now(), onupdate=func.now())
-    
-    def soft_delete(self):
-        """Mark the goal as deleted without removing it from the database."""
-        self.is_deleted = True
-        self.deleted_at = datetime.now(timezone.utc)
-    
-    def restore(self):
-        """Restore a soft-deleted goal."""
-        self.is_deleted = False
-        self.deleted_at = None
 
 
 class RecurringExpense(DataBase):
@@ -204,21 +147,8 @@ class RecurringExpense(DataBase):
     is_active = Column(Boolean, default=True)
     last_generated_date = Column(Date)
     description = Column(Text)
-    # P1-7: Soft delete columns
-    is_deleted = Column(Boolean, default=False, nullable=False, index=True)
-    deleted_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=False), server_default=func.now())
     updated_at = Column(DateTime(timezone=False), server_default=func.now(), onupdate=func.now())
-    
-    def soft_delete(self):
-        """Mark the recurring expense as deleted without removing it from the database."""
-        self.is_deleted = True
-        self.deleted_at = datetime.now(timezone.utc)
-    
-    def restore(self):
-        """Restore a soft-deleted recurring expense."""
-        self.is_deleted = False
-        self.deleted_at = None
 
 
 class IncomeSource(DataBase):

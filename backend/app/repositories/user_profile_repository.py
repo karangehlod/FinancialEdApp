@@ -4,7 +4,7 @@ from typing import Optional
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from datetime import datetime, timezone
+from datetime import datetime
 
 from app.repositories.interfaces import IUserProfileRepository
 from app.db.models.data import UserProfile
@@ -27,7 +27,7 @@ class UserProfileRepository(IUserProfileRepository):
             knowledge_level=profile_data.knowledge_level if profile_data else None,
             risk_tolerance=profile_data.risk_tolerance if profile_data else None,
             consent_given=profile_data.consent_given if profile_data else False,
-            consent_timestamp=datetime.now(timezone.utc) if profile_data and profile_data.consent_given else None
+            consent_timestamp=datetime.utcnow() if profile_data and profile_data.consent_given else None
         )
         
         self.db.add(new_profile)

@@ -3,11 +3,10 @@ import pytest
 import uuid
 from datetime import datetime, timedelta, date
 from typing import Generator, Optional, AsyncGenerator
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import MagicMock, patch
 from decimal import Decimal
 import asyncio
 import httpx
-import os
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -20,13 +19,12 @@ from app.main import app
 from app.config import settings
 from app.db.session import AuthBase, DataBase, get_auth_db, get_data_db
 from app.dependencies import get_current_user, get_redis_cache
-from app.core.security_compat import hash_password, create_access_token
+from app.core.security import hash_password, create_access_token
 from app.db.models.auth import User
 from app.db.models.data import (
     Loan, Budget, Expense, Goal, Notification, 
     IncomeSource, RecurringExpense
 )
-from app.core.provider_implementations import RedisCache
 
 
 # ============== DATABASE FIXTURES ==============
@@ -282,61 +280,12 @@ def client(async_test_auth_db: AsyncSession, async_test_data_db: AsyncSession) -
     - Testing auth endpoints (login, register, etc.)
     - Testing error responses (401 Unauthorized)
     """
-    # Provide Redis cache for testing: prefer a real Redis when requested
-    # Set the environment variable TEST_REAL_REDIS=1 and ensure settings.REDIS_URL
-    # points to a running Redis instance to exercise TTL and concurrency behaviors.
-    from app.config import settings as _settings
-
-    async def _build_redis_cache():
-        # Real Redis path
-        if os.getenv("TEST_REAL_REDIS", "0") in ("1", "true", "True") and getattr(_settings, 'REDIS_URL', None):
-            from redis import asyncio as aioredis
-            client = aioredis.from_url(
-                _settings.REDIS_URL,
-                encoding="utf-8",
-                decode_responses=True,
-            )
-            # Ensure reachable
-            try:
-                await client.ping()
-                # Clean DB to avoid cross-test pollution
-                try:
-                    await client.flushdb()
-                except Exception:
-                    pass
-                return RedisCache(client)
-            except Exception:
-                # Fallback to mock if real redis not reachable
-                pass
-
-        # Default: lightweight MagicMock cache provider (synchronous methods mimicked)
-        mock_redis_cache = MagicMock()
-        async def _get(k):
-            return None
-        async def _set(k, v, ttl=None):
-            return True
-        async def _delete(k):
-            return True
-        async def _exists(k):
-            return 0
-        mock_redis_cache.get = AsyncMock(side_effect=_get)
-        mock_redis_cache.set = AsyncMock(side_effect=_set)
-        mock_redis_cache.delete = AsyncMock(side_effect=_delete)
-        mock_redis_cache.exists = AsyncMock(side_effect=_exists)
-        return mock_redis_cache
-
-    # Resolve cache provider (async builder run) — tests expect dependency override to return an object
-    # We run the builder synchronously here because TestClient startup is synchronous; use asyncio.run when needed.
-    try:
-        redis_cache = asyncio.get_event_loop().run_until_complete(_build_redis_cache())
-    except RuntimeError:
-        # If no running loop (pytest on some setups), create a new event loop
-        loop = asyncio.new_event_loop()
-        try:
-            redis_cache = loop.run_until_complete(_build_redis_cache())
-        finally:
-            loop.close()
-
+    # Mock Redis cache for testing
+    mock_redis_cache = MagicMock()
+    mock_redis_cache.get = MagicMock(return_value=None)
+    mock_redis_cache.set = MagicMock(return_value=True)
+    mock_redis_cache.delete = MagicMock(return_value=True)
+    
     # Override database dependencies - async generators for async sessions
     async def override_get_auth_db():
         yield async_test_auth_db
@@ -345,7 +294,7 @@ def client(async_test_auth_db: AsyncSession, async_test_data_db: AsyncSession) -
         yield async_test_data_db
     
     # Override dependencies
-    app.dependency_overrides[get_redis_cache] = lambda: redis_cache
+    app.dependency_overrides[get_redis_cache] = lambda: mock_redis_cache
     app.dependency_overrides[get_auth_db] = override_get_auth_db
     app.dependency_overrides[get_data_db] = override_get_data_db
     

@@ -1,8 +1,7 @@
-from pydantic import BaseModel, validator
+from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 from uuid import UUID
-from app.utils.sanitize import clean_text
 
 
 class UserProfileBase(BaseModel):
@@ -15,10 +14,6 @@ class UserProfileBase(BaseModel):
     knowledge_level: Optional[str] = None
     risk_tolerance: Optional[str] = None
     consent_given: bool = False
-
-    @validator("first_name", "last_name", "name", "knowledge_level", "risk_tolerance", pre=True, always=False)
-    def _clean_strings(cls, v):
-        return clean_text(v)
 
 
 class UserProfileCreate(UserProfileBase):
@@ -36,10 +31,6 @@ class UserProfileUpdate(BaseModel):
     knowledge_level: Optional[str] = None
     risk_tolerance: Optional[str] = None
     consent_given: Optional[bool] = None
-
-    @validator("first_name", "last_name", "name", "knowledge_level", "risk_tolerance", pre=True, always=False)
-    def _clean_strings(cls, v):
-        return clean_text(v)
 
 
 class UserProfileResponse(UserProfileBase):

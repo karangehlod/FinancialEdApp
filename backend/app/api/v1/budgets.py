@@ -1,9 +1,9 @@
 """Budget management endpoints."""
-from fastapi import APIRouter, Depends, Query, status, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, Query, status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from typing import Optional, List
-from datetime import date, timezone
+from datetime import date
 import uuid
 
 from app.db.session import get_data_db
@@ -11,16 +11,6 @@ from app.db.models.auth import User
 from app.db.models.data import Budget, BudgetAlert
 from app.dependencies import get_current_user
 from app.core.logging import get_logger
-from app.core.cache import compute_etag, set_metadata, bump_version
-from app.core.validation_decorators import validate_budget_input, sanitize_request_fields
-from app.core.error_handling_decorators import (
-    log_operation,
-    audit_log,
-    handle_db_errors,
-    handle_not_found_errors,
-)
-from app.core.rate_limiting_decorators import rate_limit, apply_preset_limit
-from app.config import settings
 
 logger = get_logger(__name__)
 from app.schemas.budget import (
@@ -39,23 +29,15 @@ from app.services.budget_service import BudgetService
 router = APIRouter(prefix="/budgets", tags=["Budget Management"])
 
 
-def get_budget_service(
-    request: Request,
-    db: AsyncSession = Depends(get_data_db),
-) -> BudgetService:
-    """Dependency factory — builds a BudgetService per request."""
-    cache_service = getattr(request.app.state, "cache_service", None) if request else None
-    return BudgetService(db, cache_service=cache_service)
-
-
 # ============= Summary and Analytics (STATIC ROUTES BEFORE PARAMETRIC) =============
 
 @router.get("/summary", response_model=dict)
 async def get_budget_summary(
     current_user: User = Depends(get_current_user),
-    service: BudgetService = Depends(get_budget_service),
+    db: AsyncSession = Depends(get_data_db)
 ):
     """Get summary of all budgets for the current user."""
+    service = BudgetService(db)
     budgets = await service.get_user_budgets(current_user.id)
     
     total_allocated = sum(float(b.allocated_amount) for b in budgets)
@@ -75,9 +57,10 @@ async def get_budget_summary(
 async def get_budget_alerts(
     unread_only: bool = Query(False, description="Return only unread alerts"),
     current_user: User = Depends(get_current_user),
-    service: BudgetService = Depends(get_budget_service),
+    db: AsyncSession = Depends(get_data_db)
 ):
     """Get budget alerts for the current user."""
+    service = BudgetService(db)
     alerts = await service.get_user_alerts(current_user.id, unread_only)
     # Convert ORM objects to dicts
     alerts_data = [
@@ -119,9 +102,10 @@ async def get_budget_analytics(
     start_date: date = Query(..., description="Analysis start date"),
     end_date: date = Query(..., description="Analysis end date"),
     current_user: User = Depends(get_current_user),
-    service: BudgetService = Depends(get_budget_service),
+    db: AsyncSession = Depends(get_data_db)
 ):
     """Get comprehensive budget analytics for a period."""
+    service = BudgetService(db)
     analytics = await service.get_budget_analytics(
         current_user.id, start_date, end_date
     )
@@ -132,9 +116,10 @@ async def get_budget_analytics(
 async def mark_alert_as_read(
     alert_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
-    service: BudgetService = Depends(get_budget_service),
+    db: AsyncSession = Depends(get_data_db)
 ):
     """Mark a budget alert as read."""
+    service = BudgetService(db)
     success = await service.mark_alert_as_read(alert_id, current_user.id)
     if not success:
         raise HTTPException(
@@ -175,20 +160,40 @@ async def mark_alert_as_read(
         },
     },
 )
-@apply_preset_limit("create")
-@validate_budget_input
-@log_operation("create_budget", include_args=False, include_result=False)
-@audit_log(action="create", resource_type="budget")
-@handle_db_errors(rollback_on_error=True)
 async def create_budget(
     budget_data: BudgetCreate,
     current_user: User = Depends(get_current_user),
-    request: Request = None,
-    response: Response = None,
-    service: BudgetService = Depends(get_budget_service),
+    db: AsyncSession = Depends(get_data_db)
 ):
     """
     Create a new monthly budget for a specific category.
+
+    **Request body:**
+    - **month**: Budget month (YYYY-MM-01 format)
+    - **category**: Expense category (FOOD, TRANSPORT, ENTERTAINMENT, etc.)
+    - **allocated_amount**: Monthly budget limit (must be positive)
+    - **recommended_amount**: Optional recommended budget
+
+    **Returns:** Created budget with spending summary
+
+    **Errors:**
+    - **BDG_002**: Duplicate category for the month
+    - **VAL_001**: Invalid budget amount
+    - **BDG_003**: Negative or zero amount
+
+    **Example:**
+    ```json
+    {
+        "month": "2026-01-01",
+        "category": "FOOD",
+        "allocated_amount": 5000
+    }
+    ```
+
+    **Notes:**
+    - Each category can only have one budget per month
+    - Budget alerts are automatically generated at 90% and 100% utilization
+    - Spending is tracked automatically as expenses are created
     """
     logger.info(
         "Budget creation request",
@@ -199,6 +204,7 @@ async def create_budget(
     )
     
     try:
+        service = BudgetService(db)
         budget = await service.create_budget(current_user.id, budget_data)
         logger.info(
             "Budget created successfully",
@@ -206,16 +212,6 @@ async def create_budget(
             budget_id=str(budget.id),
             category=budget.category,
         )
-
-        # Bump namespace version so lists and related metadata become stale
-        try:
-            redis_client = getattr(request.app.state, "redis_client", None) if request else None
-            if redis_client:
-                logical_key = f"/api/v1/budgets?user_id={current_user.id}"
-                await bump_version(redis_client, "budgets", logical_key)
-        except Exception:
-            pass
-
         return budget
     except Exception as e:
         logger.error(
@@ -240,31 +236,44 @@ async def list_budgets(
     active_only: bool = Query(True, description="Show only active budgets"),
     start_date: Optional[date] = Query(None, description="Filter by start date"),
     end_date: Optional[date] = Query(None, description="Filter by end date"),
-    skip: int = Query(0, ge=0, description="Number of records to skip"),
-    limit: int = Query(50, ge=1, le=500, description="Max records to return (hard cap: 500)"),
     current_user: User = Depends(get_current_user),
-    request: Request = None,
-    response: Response = None,
-    service: BudgetService = Depends(get_budget_service),
+    db: AsyncSession = Depends(get_data_db)
 ):
-    """Get list of all budgets for the authenticated user."""
+    """
+    Get list of all budgets for the authenticated user.
+
+    **Query Parameters:**
+    - **active_only**: Show only active budgets (default: true)
+    - **start_date**: Filter budgets from this month
+    - **end_date**: Filter budgets until this month
+
+    **Returns:** List of budgets with current spending and alert status
+
+    **Example:**
+    ```bash
+    GET /budgets/?active_only=true&start_date=2026-01-01&end_date=2026-01-31
+    ```
+
+    **Notes:**
+    - Returns budgets with calculated spending and utilization percentage
+    - Includes any active budget alerts
+    - Supports filtering by date range
+    """
     logger.debug(
         "List budgets request",
         user_id=str(current_user.id),
         active_only=active_only,
     )
     
-    all_budgets = await service.get_user_budgets(
+    service = BudgetService(db)
+    budgets = await service.get_user_budgets(
         current_user.id, start_date, end_date
     )
-
-    # Apply pagination at the list level
-    paginated_budgets = all_budgets[skip : skip + limit]
-
+    
     # Convert to response schema with calculated fields
     from decimal import Decimal
     budget_responses = []
-    for budget in paginated_budgets:
+    for budget in budgets:
         remaining = budget.allocated_amount - budget.spent_amount
         utilization = float((budget.spent_amount / budget.allocated_amount * 100)) if budget.allocated_amount > 0 else 0.0
         alert_status = "critical" if utilization >= 100 else "warning" if utilization >= 90 else "ok"
@@ -286,7 +295,7 @@ async def list_budgets(
     logger.debug(
         "Budgets retrieved",
         user_id=str(current_user.id),
-        budget_count=len(paginated_budgets),
+        budget_count=len(budgets),
     )
     return budget_responses
 
@@ -302,9 +311,7 @@ async def list_budgets(
 async def get_budget(
     budget_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_data_db),
-    request: Request = None,
-    response: Response = None,
+    db: AsyncSession = Depends(get_data_db)
 ):
     """
     Get details of a specific budget.
@@ -349,29 +356,6 @@ async def get_budget(
             detail="Budget not found"
         )
     
-    # Attach ETag/Last-Modified metadata
-    try:
-        redis_client = getattr(request.app.state, "redis_client", None) if request else None
-        payload = {
-            "id": str(budget.id),
-            "user_id": str(budget.user_id),
-            "category": budget.category,
-            "allocated_amount": float(budget.allocated_amount),
-            "spent_amount": float(budget.spent_amount),
-            "month": budget.month.isoformat() if hasattr(budget.month, 'isoformat') else str(budget.month),
-        }
-        etag = compute_etag(payload)
-        last_modified = datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S GMT")
-        logical_key = request.url.path if request else f"/api/v1/budgets/{budget_id}"
-        if redis_client:
-            await set_metadata(redis_client, "budgets", logical_key, etag, last_modified, ttl=settings.CACHE_TTL_BUDGETS)
-        if response is not None:
-            response.headers["ETag"] = etag
-            response.headers["Last-Modified"] = last_modified
-            response.headers["X-Cache"] = "MISS"
-    except Exception:
-        pass
-
     return budget
 
 
@@ -383,20 +367,35 @@ async def get_budget(
         404: {"description": "Budget not found"},
     },
 )
-@apply_preset_limit("update")
-@validate_budget_input
-@log_operation("update_budget", include_args=False, include_result=False)
-@audit_log(action="update", resource_type="budget")
-@handle_db_errors(rollback_on_error=True)
 async def update_budget(
     budget_id: uuid.UUID,
     budget_data: BudgetUpdate,
     current_user: User = Depends(get_current_user),
-    request: Request = None,
-    response: Response = None,
-    service: BudgetService = Depends(get_budget_service),
+    db: AsyncSession = Depends(get_data_db)
 ):
-    """Update an existing budget."""
+    """
+    Update an existing budget.
+
+    **Path Parameters:**
+    - **budget_id**: Budget UUID
+
+    **Request body:**
+    - **allocated_amount**: New monthly budget limit (optional)
+    - **recommended_amount**: New recommended budget (optional)
+
+    **Returns:** Updated budget
+
+    **Errors:**
+    - **BDG_001**: Budget not found
+    - **VAL_001**: Invalid budget amount
+
+    **Example:**
+    ```json
+    {
+        "allocated_amount": 6000
+    }
+    ```
+    """
     logger.info(
         "Budget update request",
         user_id=str(current_user.id),
@@ -404,18 +403,16 @@ async def update_budget(
     )
     
     try:
-        updated = await service.update_budget(budget_id, current_user.id, budget_data)
-
-        # Bump version to invalidate metadata
-        try:
-            redis_client = getattr(request.app.state, "redis_client", None) if request else None
-            logical_key = request.url.path if request else f"/api/v1/budgets/{budget_id}"
-            if redis_client:
-                await bump_version(redis_client, "budgets", logical_key)
-        except Exception:
-            pass
-
-        return updated
+        service = BudgetService(db)
+        budget = await service.update_budget(
+            budget_id, current_user.id, budget_data
+        )
+        logger.info(
+            "Budget updated successfully",
+            user_id=str(current_user.id),
+            budget_id=str(budget_id),
+        )
+        return budget
     except Exception as e:
         logger.error(
             "Budget update failed",
@@ -434,32 +431,51 @@ async def update_budget(
         404: {"description": "Budget not found"},
     },
 )
-@apply_preset_limit("delete")
-@log_operation("delete_budget")
-@audit_log(action="delete", resource_type="budget")
-@handle_db_errors(rollback_on_error=True)
 async def delete_budget(
     budget_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
-    request: Request = None,
-    service: BudgetService = Depends(get_budget_service),
+    db: AsyncSession = Depends(get_data_db)
 ):
-    """Delete (deactivate) a budget."""
+    """
+    Delete (deactivate) a budget.
+
+    **Path Parameters:**
+    - **budget_id**: Budget UUID
+
+    **Returns:** No content (204)
+
+    **Errors:**
+    - **BDG_001**: Budget not found
+
+    **Example:**
+    ```bash
+    DELETE /budgets/550e8400-e29b-41d4-a716-446655440000
+    ```
+    **Notes:**
+    - Deleting a budget deactivates it but keeps the historical data
+    - Expenses already recorded against the budget are not deleted
+    """
     logger.info(
         "Budget deletion request",
         user_id=str(current_user.id),
         budget_id=str(budget_id),
     )
     
-    result = await service.delete_budget(budget_id, current_user.id)
-
-    # Bump version / invalidate metadata for this resource
-    try:
-        redis_client = getattr(request.app.state, "redis_client", None) if request else None
-        logical_key = request.url.path if request else f"/api/v1/budgets/{budget_id}"
-        if redis_client:
-            await bump_version(redis_client, "budgets", logical_key)
-    except Exception:
-        pass
-
-    return result
+    service = BudgetService(db)
+    success = await service.delete_budget(budget_id, current_user.id)
+    if not success:
+        logger.warning(
+            "Budget not found for deletion",
+            user_id=str(current_user.id),
+            budget_id=str(budget_id),
+        )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Budget not found"
+        )
+    
+    logger.info(
+        "Budget deleted successfully",
+        user_id=str(current_user.id),
+        budget_id=str(budget_id),
+    )

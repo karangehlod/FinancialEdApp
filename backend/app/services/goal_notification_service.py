@@ -1,6 +1,6 @@
 """Goal notification service for goal milestones and progress tracking."""
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -154,7 +154,7 @@ class GoalNotificationService:
                     goal_name=goal_data["goal_name"],
                     target_amount=goal_data["target_amount"],
                     days_to_complete=(
-                        datetime.now(timezone.utc).date() - goal_data["created_date"]
+                        datetime.utcnow().date() - goal_data["created_date"]
                     ).days,
                 )
             else:
@@ -200,7 +200,7 @@ class GoalNotificationService:
         goals = result.scalars().all()
         goal_statuses = []
 
-        today = datetime.now(timezone.utc).date()
+        today = datetime.utcnow().date()
 
         for goal in goals:
             progress = await self.get_goal_progress_percent(goal)

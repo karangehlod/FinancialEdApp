@@ -8,7 +8,6 @@ Routes:
   GET  /admin/metrics/summary         → aggregate platform statistics
   GET  /admin/audit-log               → recent audit log entries
   GET  /admin/health                  → infra health (DB, Redis, worker)
-  GET  /admin/jobs/pending            → pending ARQ jobs summary
 
 Security:
   - All routes require JWT + ADMIN scope (checked via is_admin flag on User model)
@@ -42,61 +41,31 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 
 async def require_admin(
     current_user: User = Depends(get_current_user),
-    request: Request = None,
 ) -> User:
     """
     Dependency that ensures the authenticated user has admin privileges.
 
-    Order of checks (strongest → fallback):
-      1. `User.is_admin` flag in DB
-      2. RBAC role check via `authorization_manager` (Role.ADMIN / Role.SUPERUSER)
-      3. Fallback: email in ADMIN_EMAILS config (for bootstrapping)
-
-    The RBAC check consults the in-memory `authorization_manager` which may be
-    populated from an external source in future. Any errors consulting the
-    authorization manager are treated as non-fatal and the next check is used.
+    Admin status is determined by:
+      1. User.is_admin flag in the users table (preferred)
+      2. Fallback: email in ADMIN_EMAILS config (for bootstrapping)
     """
     from app.config import settings
-    from app.core.authorization import authorization_manager, Role
 
-    client_ip = request.client.host if request and request.client else "unknown"
+    is_admin = getattr(current_user, "is_admin", False)
+    if not is_admin:
+        admin_emails = {
+            e.strip()
+            for e in (settings.ADMIN_EMAILS or "").split(",")
+            if e.strip()
+        }
+        is_admin = current_user.email in admin_emails
 
-    # 1) Prefer explicit is_admin flag stored on the user row
-    is_admin_flag = getattr(current_user, "is_admin", False)
-    if is_admin_flag:
-        logger.info("Admin access granted via is_admin flag - email=%s ip=%s", current_user.email, client_ip)
-        return current_user
-
-    # 2) Check RBAC roles (admin or superuser)
-    try:
-        roles = authorization_manager.get_user_roles(str(getattr(current_user, "id")))
-        if Role.ADMIN in roles or Role.SUPERUSER in roles:
-            roles_str = ",".join([r.value for r in roles])
-            logger.info(
-                "Admin access granted via RBAC role - email=%s roles=%s ip=%s",
-                current_user.email,
-                roles_str,
-                client_ip,
-            )
-            return current_user
-    except Exception as exc:  # pragma: no cover - defensive
-        logger.warning("Authorization manager check failed, falling back: %s", exc)
-
-    # 3) Fallback to ADMIN_EMAILS env var for bootstrapping
-    admin_emails = {
-        e.strip()
-        for e in (settings.ADMIN_EMAILS or "").split(",")
-        if e.strip()
-    }
-    if current_user.email in admin_emails:
-        logger.info("Admin access granted via ADMIN_EMAILS - email=%s ip=%s", current_user.email, client_ip)
-        return current_user
-
-    logger.warning("Admin access denied - email=%s ip=%s", getattr(current_user, "email", None), client_ip)
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
-        detail="Admin privileges required.",
-    )
+    if not is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin privileges required.",
+        )
+    return current_user
 
 
 # ---------------------------------------------------------------------------
@@ -353,7 +322,7 @@ async def platform_metrics(
     summary="Recent system audit log entries",
 )
 async def audit_log(
-    limit: int = Query(100, ge=1, le=500, description="Max entries to return (hard cap: 500)"),
+    limit: int = Query(100, ge=1, le=1000),
     admin: User = Depends(require_admin),
     data_db: AsyncSession = Depends(get_data_db),
 ):
@@ -416,22 +385,3 @@ async def admin_health(
         "checked_at": datetime.now(timezone.utc).isoformat(),
         "checked_by": admin.email,
     }
-
-
-# ---------------------------------------------------------------------------
-# ARQ Jobs
-# ---------------------------------------------------------------------------
-
-@router.get("/jobs/pending")
-async def pending_jobs(request: Request, _: None = Depends(require_admin)):
-    """Return a small summary about pending jobs in ARQ queue (best-effort)."""
-    try:
-        import redis
-        from app.config import settings
-        r = redis.from_url(settings.REDIS_URL)
-        # ARQ uses list "arq:queue", but this is an implementation detail; best-effort
-        length = r.llen("arq:queue")
-        return {"pending": int(length)}
-    except Exception as exc:
-        logger.warning("Could not fetch pending jobs: %s", exc)
-        return {"pending": None, "error": str(exc)}

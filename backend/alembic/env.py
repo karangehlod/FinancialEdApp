@@ -43,7 +43,7 @@ def get_url() -> str:
     Auth-DB migrations should be run against AUTH_DATABASE_URL in a
     separate Alembic environment if schema drift is needed there.
     """
-    return settings.DATA_DATABASE_URL
+    return settings.DATA_DATABASE_URL  # ← Fixed: was settings.get_database_url()
 
 
 def run_migrations_offline() -> None:

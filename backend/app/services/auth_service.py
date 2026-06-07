@@ -27,8 +27,6 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID
 
-from app.config import settings
-from app.core.auth_lock import AuthLock
 from app.core.exceptions import AuthenticationError, UserAlreadyExistsError
 from app.core.providers import CacheProvider, PasswordHasher, TokenProvider
 from app.db.models.auth import User
@@ -36,8 +34,6 @@ from app.repositories.interfaces import IUserRepository
 from app.repositories.refresh_token_repository import RefreshTokenRepository
 from app.schemas.auth import UserCreate
 from app.services.base_service import BaseService
-from app.core.cache_service import CacheKey, CacheTTL
-from app.utils.datetime_utils import utcnow_naive
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +42,8 @@ logger = logging.getLogger(__name__)
 # --------------------------------------------------------------------------
 _REFRESH_TOKEN_TTL_SECONDS  = 60 * 60 * 24 * 7   # 7 days
 _USER_SESSION_BLACKLIST_TTL = 60 * 60 * 24         # 24 hours
+_FAILED_LOGIN_WINDOW        = 60 * 15              # 15-minute sliding window
+_FAILED_LOGIN_MAX           = 5                    # lockout threshold
 
 
 class AuthService(BaseService):
@@ -74,7 +72,6 @@ class AuthService(BaseService):
         self.token_provider = token_provider
         self.refresh_token_repo = refresh_token_repository
         self.cache = cache
-        self.auth_lock = AuthLock(cache)
         self.log_operation("auth_service_initialized")
     
     async def validate_dependencies(self) -> bool:
@@ -118,7 +115,7 @@ class AuthService(BaseService):
         self.log_operation(operation, {"email": email})
 
         # Account lockout check
-        if await self.auth_lock.is_locked(email):
+        if self.cache and await self._is_locked_out(email):
             logger.warning("Login blocked — account locked out: %s", email)
             raise AuthenticationError("Account temporarily locked. Try again later.")
 
@@ -128,17 +125,17 @@ class AuthService(BaseService):
             self.password_hasher.verify_password(
                 "dummy", "$2b$12$notarealhash00000000000000000000000000000000000"
             )
-            await self.auth_lock.record_failed_login(email)
+            await self._record_failed_login(email)
             self.log_operation(f"{operation}_failed_not_found", {"email": email}, level="warning")
             return None
 
         if not self.password_hasher.verify_password(password, user.password_hash):
-            await self.auth_lock.record_failed_login(email)
+            await self._record_failed_login(email)
             self.log_operation(f"{operation}_failed_bad_password", {"email": email}, level="warning")
             return None
 
         # Successful — clear lockout counter
-        await self.auth_lock.clear_failed_logins(email)
+        await self._clear_failed_logins(email)
         await self.user_repository.update_last_login(user.id)
         self.log_operation(f"{operation}_success", {"user_id": str(user.id)})
         return user
@@ -177,7 +174,7 @@ class AuthService(BaseService):
 
         # Persist hash — never the raw token
         token_hash = _sha256(refresh_token)
-        expires_at = utcnow_naive() + timedelta(
+        expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(
             seconds=_REFRESH_TOKEN_TTL_SECONDS
         )
         await self.refresh_token_repo.create(
@@ -186,24 +183,6 @@ class AuthService(BaseService):
             expires_at=expires_at,
             device_info=device_info,
         )
-
-        # Populate token->user cache (cache-aside) keyed by user id so
-        # subsequent requests presenting the same access token can avoid DB lookup.
-        try:
-            if self.cache:
-                await self.cache.set(
-                    CacheKey.token_user(str(user.id)),
-                    {
-                        "id": str(user.id),
-                        "email": user.email,
-                        "is_active": user.is_active,
-                        "is_verified": user.is_verified,
-                    },
-                    ttl=CacheTTL.TOKEN_USER,
-                )
-        except Exception:
-            # Non-fatal — cache failures should not block auth flows
-            logger.debug("Failed to populate token->user cache for user %s", str(user.id))
 
         self.log_operation(f"{operation}_success", {"user_id": str(user.id)})
         return _build_token_response(access_token, refresh_token, user)
@@ -279,7 +258,7 @@ class AuthService(BaseService):
         #    This prevents the unique-constraint violation that occurred when
         #    create() and revoke() each committed independently.
         new_hash = _sha256(new_refresh_token)
-        new_expires_at = utcnow_naive() + timedelta(
+        new_expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(
             seconds=_REFRESH_TOKEN_TTL_SECONDS
         )
         await self.refresh_token_repo.rotate(
@@ -289,22 +268,6 @@ class AuthService(BaseService):
             new_expires_at=new_expires_at,
             device_info=device_info,
         )
-
-        # Update token->user cache after rotation
-        try:
-            if self.cache:
-                await self.cache.set(
-                    CacheKey.token_user(str(user.id)),
-                    {
-                        "id": str(user.id),
-                        "email": user.email,
-                        "is_active": user.is_active,
-                        "is_verified": user.is_verified,
-                    },
-                    ttl=CacheTTL.TOKEN_USER,
-                )
-        except Exception:
-            logger.debug("Failed to update token->user cache for user %s", str(user.id))
 
         self.log_operation(f"{operation}_success", {"user_id": str(user.id)})
         return _build_token_response(new_access_token, new_refresh_token, user)
@@ -327,11 +290,6 @@ class AuthService(BaseService):
                 f"user_blacklist:{user_id}", "logged_out",
                 ttl=_USER_SESSION_BLACKLIST_TTL,
             )
-            # Evict token->user cache so further requests hit DB and fail fast if session ended
-            try:
-                await self.cache.delete(CacheKey.token_user(str(user_id)))
-            except Exception:
-                logger.debug("Failed to evict token->user cache for user %s", str(user_id))
 
         self.log_operation(f"{operation}_success", {"user_id": str(user_id)})
         return True
@@ -361,6 +319,38 @@ class AuthService(BaseService):
         except Exception as exc:
             logger.error("Error checking user blacklist: %s", exc)
             return False
+
+    # ------------------------------------------------------------------
+    # Account lockout helpers (Redis sliding window)
+    # ------------------------------------------------------------------
+
+    async def _is_locked_out(self, email: str) -> bool:
+        """Return True if this email has exceeded the failed-login threshold."""
+        if not self.cache:
+            return False
+        try:
+            count_str = await self.cache.get(f"lockout:{email}")
+            return bool(count_str) and int(count_str) >= _FAILED_LOGIN_MAX
+        except Exception:
+            return False
+
+    async def _record_failed_login(self, email: str) -> None:
+        """Increment the failed-login counter; set TTL on first increment."""
+        if not self.cache:
+            return
+        try:
+            await self.cache.increment(f"lockout:{email}", ttl=_FAILED_LOGIN_WINDOW)
+        except Exception as exc:
+            logger.debug("Could not record failed login for %s: %s", email, exc)
+
+    async def _clear_failed_logins(self, email: str) -> None:
+        """Reset the failed-login counter on successful login."""
+        if not self.cache:
+            return
+        try:
+            await self.cache.delete(f"lockout:{email}")
+        except Exception as exc:
+            logger.debug("Could not clear login counter for %s: %s", email, exc)
 
     # ------------------------------------------------------------------
     # Password change
@@ -408,15 +398,8 @@ class AuthService(BaseService):
 # --------------------------------------------------------------------------
 
 def _sha256(value: str) -> str:
-    """Return the hex-encoded HMAC-SHA-256 digest of a UTF-8 string using the app secret.
-
-    Uses settings.SECRET_KEY as the HMAC key. This provides a fast, keyed one-way
-    hash suitable for storing refresh token fingerprints in the database.
-    """
-    import hmac
-    import hashlib as _hashlib
-    key = settings.SECRET_KEY.encode('utf-8')
-    return hmac.new(key, value.encode('utf-8'), _hashlib.sha256).hexdigest()
+    """Return the hex-encoded SHA-256 digest of a UTF-8 string."""
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
 def _build_token_response(access_token: str, refresh_token: str, user: User) -> dict:

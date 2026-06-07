@@ -3,8 +3,7 @@
 import bcrypt
 import json
 from typing import Optional, Dict, Any
-from datetime import datetime, timedelta, timezone
-import hashlib
+from datetime import datetime, timedelta
 import logging
 from jose import JWTError, jwt
 
@@ -46,7 +45,7 @@ class BcryptPasswordHasher(PasswordHasher):
             hashed_bytes = hashed_password.encode('utf-8')
             return bcrypt.checkpw(password_bytes, hashed_bytes)
         except Exception as e:
-            logger.error("Error verifying password: %s", e)
+            logger.error(f"Error verifying password: {e}")
             return False
 
 
@@ -83,9 +82,9 @@ class JWTTokenProvider(TokenProvider):
         to_encode = data.copy()
         
         if expires_delta:
-            expire = datetime.now(timezone.utc) + expires_delta
+            expire = datetime.utcnow() + expires_delta
         else:
-            expire = datetime.now(timezone.utc) + timedelta(
+            expire = datetime.utcnow() + timedelta(
                 minutes=self.access_token_expire_minutes
             )
         
@@ -99,10 +98,9 @@ class JWTTokenProvider(TokenProvider):
     
     def create_refresh_token(self, data: dict) -> str:
         """Create a refresh token."""
-        import uuid as _uuid
         to_encode = data.copy()
-        expire = datetime.now(timezone.utc) + timedelta(days=self.refresh_token_expire_days)
-        to_encode.update({"exp": expire, "type": "refresh", "jti": str(_uuid.uuid4())})
+        expire = datetime.utcnow() + timedelta(days=self.refresh_token_expire_days)
+        to_encode.update({"exp": expire, "type": "refresh"})
         encoded_jwt = jwt.encode(
             to_encode,
             self.secret_key,
@@ -120,59 +118,19 @@ class JWTTokenProvider(TokenProvider):
             )
             return payload
         except JWTError as e:
-            logger.error("Error decoding token: %s", e)
+            logger.error(f"Error decoding token: {e}")
             raise
     
     def is_token_expired(self, token: str) -> bool:
-        """Check if a token is expired.
-
-        Uses UTC-based timestamp comparison to avoid local timezone issues.
-        """
+        """Check if a token is expired."""
         try:
             payload = self.decode_token(token)
             exp = payload.get("exp")
             if exp is None:
                 return True
-            # exp is an int epoch-seconds value per the JWT spec
-            try:
-                exp_dt = datetime.fromtimestamp(int(exp), tz=timezone.utc)
-            except Exception:
-                if isinstance(exp, datetime):
-                    exp_dt = exp.replace(tzinfo=timezone.utc) if exp.tzinfo is None else exp
-                else:
-                    return True
-            return exp_dt < datetime.now(timezone.utc)
+            return datetime.fromtimestamp(exp) < datetime.utcnow()
         except Exception:
             return True
-    
-    def compute_token_sha256(self, token: str) -> str:
-        """Return SHA-256 hex digest for a given token string.
-
-        Clear name (sha256) to distinguish from HMAC-based digests used for DB storage.
-        """
-        return hashlib.sha256(token.encode('utf-8')).hexdigest()
-
-    # Backwards-compatible alias for existing callers
-    _compute_token_hash = compute_token_sha256
-
-    def compute_token_hmac(self, token: str) -> str:
-        """Return HMAC-SHA256 hex digest for a given token using the application secret.
-
-        Use HMAC when persisting/verifying tokens in the DB to avoid storing raw token/unsalted hashes.
-        """
-        import hmac
-        import hashlib as _hashlib
-        key = settings.SECRET_KEY.encode('utf-8')
-        return hmac.new(key, token.encode('utf-8'), _hashlib.sha256).hexdigest()
-
-    @staticmethod
-    def secure_compare(a: str, b: str) -> bool:
-        """Constant-time comparison for digests to avoid timing attacks."""
-        import hmac as _hmac
-        try:
-            return _hmac.compare_digest(a, b)
-        except Exception:
-            return False
 
 
 class RedisCache(CacheProvider):
@@ -200,17 +158,13 @@ class RedisCache(CacheProvider):
             raw = await self.redis.get(key)
             if raw is None:
                 return None
-            # Redis client commonly returns bytes; decode to string first
-            if isinstance(raw, (bytes, bytearray)):
-                raw = raw.decode('utf-8')
             # Deserialize JSON → Python object
             return json.loads(raw)
         except json.JSONDecodeError:
             # Value stored as plain string (legacy) — return as-is
             return raw
         except Exception as exc:
-            # Avoid logging sensitive content; include key and exception for triage
-            logger.debug("Cache GET error for key '%s': %s", key, exc)
+            logger.error("Cache GET error for key '%s': %s", key, exc)
             return None
 
     async def set(
@@ -235,7 +189,7 @@ class RedisCache(CacheProvider):
                 await self.redis.set(key, serialized)
             return True
         except Exception as exc:
-            logger.debug("Cache SET error for key '%s': %s", key, exc)
+            logger.error("Cache SET error for key '%s': %s", key, exc)
             return False
 
     async def delete(self, key: str) -> bool:
@@ -244,7 +198,7 @@ class RedisCache(CacheProvider):
             await self.redis.delete(key)
             return True
         except Exception as exc:
-            logger.debug("Cache DELETE error for key '%s': %s", key, exc)
+            logger.error("Cache DELETE error for key '%s': %s", key, exc)
             return False
 
     async def clear_pattern(self, pattern: str) -> int:
@@ -265,7 +219,7 @@ class RedisCache(CacheProvider):
             logger.debug("Cleared %d cache keys matching '%s'", deleted, pattern)
             return deleted
         except Exception as exc:
-            logger.debug("Cache CLEAR_PATTERN error for pattern '%s': %s", pattern, exc)
+            logger.error("Cache CLEAR_PATTERN error for pattern '%s': %s", pattern, exc)
             return 0
 
     async def exists(self, key: str) -> bool:
@@ -273,7 +227,7 @@ class RedisCache(CacheProvider):
         try:
             return bool(await self.redis.exists(key))
         except Exception as exc:
-            logger.debug("Cache EXISTS error for key '%s': %s", key, exc)
+            logger.error("Cache EXISTS error for key '%s': %s", key, exc)
             return False
 
     async def increment(self, key: str, ttl: Optional[int] = None) -> int:
@@ -289,7 +243,7 @@ class RedisCache(CacheProvider):
                 await self.redis.expire(key, ttl)
             return count
         except Exception as exc:
-            logger.debug("Cache INCREMENT error for key '%s': %s", key, exc)
+            logger.error("Cache INCREMENT error for key '%s': %s", key, exc)
             return 0
 
 
@@ -304,48 +258,18 @@ class AESEncryption(EncryptionProvider):
             encryption_key: Encryption key (uses settings.ENCRYPTION_KEY if not provided)
         """
         from cryptography.fernet import Fernet
-        import base64
-
+        
         self.encryption_key = encryption_key or settings.ENCRYPTION_KEY
-
-        # If the provided value already looks like a valid Fernet key (urlsafe base64 32 bytes -> 44 chars),
-        # use it directly. Otherwise derive a Fernet-compatible key from the passphrase using PBKDF2HMAC.
-        try:
-            key_bytes = None
-            if isinstance(self.encryption_key, str) and len(self.encryption_key) == 44:
-                # probably a valid Fernet URL-safe base64-encoded key
-                key_bytes = self.encryption_key.encode('utf-8')
-            else:
-                # Derive a stable key from passphrase using PBKDF2HMAC. A salt should be provided via
-                # settings.ENCRYPTION_SALT for production; fallback to a stable application salt.
-                from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-                from cryptography.hazmat.primitives import hashes
-                from cryptography.hazmat.backends import default_backend
-
-                salt = getattr(settings, 'ENCRYPTION_SALT', None)
-                if salt is None:
-                    # Warn but continue; using a fixed fallback salt is less secure but keeps compatibility
-                    logger.warning('ENCRYPTION_SALT not set; using default fallback salt. Consider setting ENCRYPTION_SALT in secure config.')
-                    salt = b'financialapp-default-salt'
-                if isinstance(salt, str):
-                    salt = salt.encode('utf-8')
-
-                kdf = PBKDF2HMAC(
-                    algorithm=hashes.SHA256(),
-                    length=32,
-                    salt=salt,
-                    iterations=100_000,
-                    backend=default_backend()
-                )
-                key_bytes = base64.urlsafe_b64encode(
-                    kdf.derive((self.encryption_key or '').encode('utf-8'))
-                )
-
+        
+        # Ensure key is proper length
+        if isinstance(self.encryption_key, str):
+            import base64
+            key_bytes = base64.urlsafe_b64encode(
+                self.encryption_key.encode().ljust(32)[:32]
+            )
             self.cipher = Fernet(key_bytes)
-        except Exception as e:
-            logger.error('Failed to initialize AESEncryption: %s', e)
-            # Re-raise so misconfiguration fails fast during startup rather than silently degrade
-            raise
+        else:
+            self.cipher = Fernet(self.encryption_key)
     
     def encrypt(self, plaintext: str) -> str:
         """Encrypt plaintext data."""
@@ -354,7 +278,7 @@ class AESEncryption(EncryptionProvider):
             encrypted = self.cipher.encrypt(plaintext_bytes)
             return encrypted.decode('utf-8')
         except Exception as e:
-            logger.debug("Error encrypting data: %s", e)
+            logger.error(f"Error encrypting data: {e}")
             raise
     
     def decrypt(self, ciphertext: str) -> str:
@@ -364,7 +288,7 @@ class AESEncryption(EncryptionProvider):
             decrypted = self.cipher.decrypt(ciphertext_bytes)
             return decrypted.decode('utf-8')
         except Exception as e:
-            logger.debug("Error decrypting data: %s", e)
+            logger.error(f"Error decrypting data: {e}")
             raise
     
     def hash_value(self, value: str) -> str:
@@ -374,11 +298,7 @@ class AESEncryption(EncryptionProvider):
 
 
 class DatabaseAuditLogger(AuditLogger):
-    """Database-backed audit logger implementation.
-
-    NOTE: current implementation is a lightweight stub that logs to the application logger.
-    For production audit queries and retention, implement DB-backed storage (e.g. audit table
-    and use the provided db_session to persist events)."""
+    """Database-backed audit logger implementation."""
     
     def __init__(self, db_session):
         """
@@ -401,7 +321,7 @@ class DatabaseAuditLogger(AuditLogger):
         """Log an action for audit purposes."""
         try:
             # This will be implemented with actual database model
-            # For now, just log to logger (non-persistent)
+            # For now, just log to logger
             logger.info(
                 f"Audit: user={user_id}, action={action}, "
                 f"resource={resource_type}:{resource_id}, status={status}",
@@ -409,7 +329,7 @@ class DatabaseAuditLogger(AuditLogger):
             )
             return True
         except Exception as e:
-            logger.debug("Error logging audit action: %s", e)
+            logger.error(f"Error logging audit action: {e}")
             return False
     
     async def log_security_event(
@@ -428,7 +348,7 @@ class DatabaseAuditLogger(AuditLogger):
             )
             return True
         except Exception as e:
-            logger.debug("Error logging security event: %s", e)
+            logger.error(f"Error logging security event: {e}")
             return False
     
     async def get_audit_trail(

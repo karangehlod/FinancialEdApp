@@ -12,7 +12,7 @@ from pytest_bdd import given, when, then, parsers, scenarios
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.core.security_compat import create_access_token, decode_token
+from app.core.security import create_access_token
 
 scenarios("../features/expenses.feature")
 
@@ -23,19 +23,7 @@ scenarios("../features/expenses.feature")
 
 
 @pytest.fixture
-def _bdd_user_id():
-    """Shared user ID for the test session."""
-    return uuid.uuid4()
-
-
-@pytest.fixture
-def http_client(_bdd_user_id):
-    import asyncio
-    from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-    from app.db.session import AuthBase, DataBase, get_auth_db, get_data_db
-    from app.dependencies import get_redis_cache, get_current_user, get_current_active_user
-    from app.db.models.auth import User
-
+def http_client():
     mock_redis = AsyncMock()
     mock_redis.ping = AsyncMock(return_value=True)
     mock_redis.get = AsyncMock(return_value=None)
@@ -43,100 +31,20 @@ def http_client(_bdd_user_id):
     mock_redis.delete = AsyncMock(return_value=1)
     mock_redis.evalsha = AsyncMock(return_value=[1, 1])
     mock_redis.eval = AsyncMock(return_value=[1, 1])
-    mock_redis.aclose = AsyncMock()
 
     mock_limiter = AsyncMock()
     mock_limiter.check_and_increment = AsyncMock(return_value=(True, 1))
 
-    auth_engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False,
-                                      connect_args={"check_same_thread": False})
-    data_engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False,
-                                      connect_args={"check_same_thread": False})
-
-    loop = asyncio.new_event_loop()
-
-    async def _setup():
-        async with auth_engine.begin() as conn:
-            await conn.run_sync(AuthBase.metadata.create_all)
-        async with data_engine.begin() as conn:
-            await conn.run_sync(DataBase.metadata.create_all)
-
-    loop.run_until_complete(_setup())
-
-    AuthSession = async_sessionmaker(auth_engine, class_=AsyncSession, expire_on_commit=False)
-    DataSession = async_sessionmaker(data_engine, class_=AsyncSession, expire_on_commit=False)
-
-    async def override_get_auth_db():
-        async with AuthSession() as session:
-            yield session
-
-    async def override_get_data_db():
-        async with DataSession() as session:
-            yield session
-
-    # Dynamic mock user: reads user_id from the Bearer token so that different
-    # tokens produce different users (needed for "other user" isolation tests).
-    from fastapi import Request, Depends
-    from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-    from typing import Optional
-
-    _security = HTTPBearer(auto_error=False)
-
-    async def override_get_current_user(
-        request: Request,
-        credentials: Optional[HTTPAuthorizationCredentials] = Depends(_security),
-    ):
-        user_id = _bdd_user_id  # default to main user
-        email = "expenses_bdd@test.com"
-        if credentials and credentials.credentials:
-            try:
-                payload = decode_token(credentials.credentials)
-                sub = payload.get("sub")
-                if sub:
-                    user_id = uuid.UUID(sub)
-                    email = payload.get("email", f"{sub}@test.com")
-            except Exception:
-                pass
-        mock_user = User()
-        mock_user.id = user_id
-        mock_user.email = email
-        mock_user.is_active = True
-        mock_user.is_verified = True
-        return mock_user
-
-    async def override_get_current_active_user(
-        request: Request,
-        credentials: Optional[HTTPAuthorizationCredentials] = Depends(_security),
-    ):
-        return await override_get_current_user(request, credentials)
-
-    app.dependency_overrides[get_auth_db] = override_get_auth_db
-    app.dependency_overrides[get_data_db] = override_get_data_db
-    app.dependency_overrides[get_redis_cache] = lambda: None
-    app.dependency_overrides[get_current_user] = override_get_current_user
-    app.dependency_overrides[get_current_active_user] = override_get_current_active_user
-
-    with patch("redis.asyncio.from_url", return_value=mock_redis):
-        with patch("app.startup_checks.perform_startup_checks", return_value=True):
-            with TestClient(app) as client:
-                if hasattr(app.state, "rate_limiter") and app.state.rate_limiter is not None:
-                    app.state.rate_limiter.check_and_increment = mock_limiter.check_and_increment
-                yield client
-
-    for dep in [get_auth_db, get_data_db, get_redis_cache, get_current_user, get_current_active_user]:
-        app.dependency_overrides.pop(dep, None)
-
-    async def _teardown():
-        await auth_engine.dispose()
-        await data_engine.dispose()
-
-    loop.run_until_complete(_teardown())
-    loop.close()
+    with patch("app.startup_checks.perform_startup_checks", return_value=True):
+        with TestClient(app) as client:
+            app.state.rate_limiter = mock_limiter
+            app.state.redis_client = mock_redis
+            yield client
 
 
 @pytest.fixture
-def user_id(_bdd_user_id):
-    return str(_bdd_user_id)
+def user_id():
+    return str(uuid.uuid4())
 
 
 @pytest.fixture
@@ -175,16 +83,8 @@ def i_am_authenticated(auth_headers):
     target_fixture="response",
 )
 def create_expense_from_table(http_client, auth_headers, datatable):
-    """Handle Gherkin datatable (list of rows from pytest-bdd 8.x)."""
-    # pytest-bdd 8.x returns datatable as list of rows (first row = headers)
-    if datatable and isinstance(datatable[0], (list, tuple)):
-        headers = datatable[0]
-        values = datatable[1] if len(datatable) > 1 else []
-        row = dict(zip(headers, values))
-    elif datatable and isinstance(datatable[0], dict):
-        row = datatable[0]
-    else:
-        row = {}
+    """Handle Gherkin datatable (list of dicts from pytest-bdd)."""
+    row = datatable[0] if datatable else {}
     payload = {
         "amount": float(row.get("amount", 500.0)),
         "category": row.get("category", "food"),
@@ -209,32 +109,10 @@ def create_expense_with_amount(http_client, auth_headers, amount, cat, date):
 
 
 @when(
-    parsers.re(r'I create an expense with amount (?P<amount>-?[\d.]+) in category "(?P<cat>[^"]+)" on date "(?P<date>[^"]+)"'),
-    target_fixture="response",
-)
-def create_expense_with_amount_re(http_client, auth_headers, amount, cat, date):
-    return http_client.post(
-        "/api/v1/expenses",
-        json={"amount": float(amount), "category": cat, "date": date},
-        headers=auth_headers,
-    )
-
-
-@when(
     parsers.parse("I create an expense with missing {field!r} field"),
     target_fixture="response",
 )
 def create_expense_missing_field(http_client, auth_headers, field):
-    payload = {"amount": 100.0, "category": "food", "date": "2026-02-01"}
-    payload.pop(field, None)
-    return http_client.post("/api/v1/expenses", json=payload, headers=auth_headers)
-
-
-@when(
-    parsers.re(r'I create an expense with missing "(?P<field>[^"]+)" field'),
-    target_fixture="response",
-)
-def create_expense_missing_field_re(http_client, auth_headers, field):
     payload = {"amount": 100.0, "category": "food", "date": "2026-02-01"}
     payload.pop(field, None)
     return http_client.post("/api/v1/expenses", json=payload, headers=auth_headers)
@@ -265,23 +143,14 @@ def request_get(http_client, auth_headers, path):
     return http_client.get(path, headers=auth_headers)
 
 
-@when(parsers.re(r'I request GET "(?P<path>[^"]+)"'), target_fixture="response")
-def request_get_re(http_client, auth_headers, path):
-    return http_client.get(path, headers=auth_headers)
-
-
 @then(
     parsers.parse("the response body should be a list with at least {n:d} items")
 )
 def list_has_at_least_n(response, n):
     data = response.json()
-    if isinstance(data, list):
-        items = data
-    else:
-        # Try common pagination wrapper keys
-        items = data.get("expenses", data.get("data", data.get("items", [])))
+    items = data if isinstance(data, list) else data.get("data", data.get("items", []))
     assert len(items) >= n, (
-        f"Expected at least {n} items, got {len(items)}. Response: {response.text[:300]}"
+        f"Expected at least {n} items, got {len(items)}"
     )
 
 
@@ -458,13 +327,6 @@ def assert_status(response, status):
 
 @then(parsers.parse("the response body should contain {text!r}"))
 def assert_body_contains(response, text):
-    assert text in response.text, (
-        f"Expected {text!r} in response. Got: {response.text[:300]}"
-    )
-
-
-@then(parsers.re(r'the response body should contain "(?P<text>[^"]+)"'))
-def assert_body_contains_quoted(response, text):
     assert text in response.text, (
         f"Expected {text!r} in response. Got: {response.text[:300]}"
     )

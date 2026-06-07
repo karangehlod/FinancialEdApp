@@ -2,7 +2,7 @@
 
 from typing import Optional, List, Any
 from uuid import UUID
-from datetime import date, datetime, timezone
+from datetime import date
 from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func
@@ -13,11 +13,6 @@ from app.schemas.financial_profile import FinancialProfileCreate
 from app.core.exceptions import ResourceNotFoundError
 from app.repositories.budget_repository import BudgetRepository
 from app.services.base_service import CRUDService
-from app.core.cache_decorator import cache_response, budget_list_key
-from app.core.cache_service import CacheTTL
-from app.core.transaction_decorators import transactional, with_retry
-from app.services.service_interfaces import IBudgetService
-from app.utils.datetime_utils import utcnow_naive
 
 
 class BudgetCalculator:
@@ -61,8 +56,6 @@ class FinancialProfileService:
         """Initialize with database session."""
         self.db = db
     
-    @transactional(rollback_on_error=True)
-    @with_retry(max_attempts=3, backoff="exponential")
     async def create_or_update(
         self,
         user_id: UUID,
@@ -162,14 +155,14 @@ class FinancialProfileService:
                 )
                 profile.disposable_income = profile.monthly_salary - fixed_expenses
             
-            profile.updated_at = utcnow_naive()
+            profile.updated_at = datetime.utcnow()
             await self.db.commit()
             await self.db.refresh(profile)
         
         return profile
 
 
-class BudgetService(CRUDService[Budget], IBudgetService):
+class BudgetService(CRUDService[Budget]):
     """
     Main budget service — orchestrates all budget-related operations.
 
@@ -244,8 +237,6 @@ class BudgetService(CRUDService[Budget], IBudgetService):
         return await self.get_user_budgets(user_id, start_date, end_date)
     
     # Domain-specific business methods
-    @transactional(rollback_on_error=True)
-    @with_retry(max_attempts=3, backoff="exponential")
     async def create_budget(self, user_id: UUID, budget_data: BudgetCreate) -> Budget:
         """Create a new budget and invalidate the budget cache."""
         result = await self.repository.create(user_id, budget_data)
@@ -256,24 +247,6 @@ class BudgetService(CRUDService[Budget], IBudgetService):
         """Get a specific budget."""
         return await self.repository.get_by_id(budget_id, user_id)
 
-    async def _serialize_budgets(self, budgets: List[Budget]) -> List[dict]:
-        return [
-            {
-                "id": str(b.id),
-                "user_id": str(b.user_id),
-                "category": b.category,
-                "allocated_amount": float(b.allocated_amount),
-                "spent_amount": float(b.spent_amount),
-                "month": b.month.isoformat() if hasattr(b.month, 'isoformat') else str(b.month),
-            }
-            for b in budgets
-        ]
-
-    def _deserialize_budgets(self, data: List[dict]):
-        """Return cached list (already serialised dicts)."""
-        return data
-
-    @cache_response(ttl=CacheTTL.BUDGET_SUMMARY, key_func=budget_list_key, serializer_attr="_serialize_budgets", deserializer_attr="_deserialize_budgets", namespace="budgets")
     async def get_user_budgets(
         self,
         user_id: UUID,
@@ -281,11 +254,8 @@ class BudgetService(CRUDService[Budget], IBudgetService):
         end_date: Optional[date] = None,
     ) -> List[Budget]:
         """Get all budgets for a user."""
-        budgets = await self.repository.get_by_user(user_id, start_date, end_date)
-        return budgets
+        return await self.repository.get_by_user(user_id, start_date, end_date)
 
-    @transactional(rollback_on_error=True)
-    @with_retry(max_attempts=3, backoff="exponential")
     async def update_budget(
         self, budget_id: UUID, user_id: UUID, budget_data: BudgetUpdate
     ) -> Budget:
@@ -294,7 +264,6 @@ class BudgetService(CRUDService[Budget], IBudgetService):
         await self._invalidate_budget_cache(user_id)
         return result
 
-    @transactional(rollback_on_error=True)
     async def delete_budget(self, budget_id: UUID, user_id: UUID) -> bool:
         """Delete a budget and invalidate the budget cache."""
         result = await self.repository.delete(budget_id, user_id)
@@ -359,63 +328,6 @@ class BudgetService(CRUDService[Budget], IBudgetService):
         query = query.order_by(desc(BudgetAlert.created_at))
         result = await self.db.execute(query)
         return result.scalars().all()
-
-    async def get_budget_alerts(
-        self,
-        budget_id: UUID,
-        user_id: UUID,
-    ) -> List[BudgetWithAlert]:
-        """
-        Get alerts for a specific budget (IBudgetService compliance).
-
-        Returns a list of BudgetWithAlert — the single budget entry enriched
-        with alert metadata derived from its current utilisation.
-        """
-        from sqlalchemy import select
-        from app.db.models.data import Budget as BudgetModel
-
-        result = await self.db.execute(
-            select(BudgetModel).where(
-                BudgetModel.id == budget_id,
-                BudgetModel.user_id == user_id,
-            )
-        )
-        budget = result.scalar_one_or_none()
-        if not budget:
-            return []
-
-        utilization = (
-            float(budget.spent_amount / budget.allocated_amount * 100)
-            if budget.allocated_amount > 0
-            else 0.0
-        )
-        alert_status = (
-            "critical" if utilization >= 100
-            else "warning" if utilization >= 90
-            else "ok"
-        )
-        remaining = budget.allocated_amount - budget.spent_amount
-
-        return [
-            BudgetWithAlert(
-                id=budget.id,
-                user_id=budget.user_id,
-                category=budget.category,
-                allocated_amount=budget.allocated_amount,
-                spent_amount=budget.spent_amount,
-                month=budget.month,
-                recommended_amount=getattr(budget, "recommended_amount", None),
-                remaining_amount=remaining,
-                utilization_percentage=utilization,
-                alert_status=alert_status,
-                alert_message=(
-                    f"Budget utilization is {utilization:.1f}%"
-                    if alert_status != "ok"
-                    else None
-                ),
-                created_at=budget.created_at,
-            )
-        ]
     
     async def mark_alert_as_read(
         self,

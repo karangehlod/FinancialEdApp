@@ -4,7 +4,7 @@ from typing import Dict, List
 from enum import Enum
 
 from app.schemas.loan import LoanType, LoanStatus, PaymentStatus
-from app.services.loan_domain import LoanDisplayStatus, PaymentDisplayStatus, LoanStatusEnum, PaymentStatusEnum
+from app.services.loan_domain import LoanStatusEnum, PaymentStatusEnum
 from app.core.authorization import Permission, Role
 from app.core.exceptions import ErrorCode
 from app.api.v1.health import HealthStatus
@@ -44,11 +44,11 @@ async def get_loan_statuses():
 
 @router.get("/loan-statuses-domain")
 async def get_loan_statuses_domain():
-    """Get all available loan display statuses from domain model."""
+    """Get all available loan statuses from domain model."""
     return {
-        "enum_name": "LoanDisplayStatus",
-        "values": enum_to_dict(LoanDisplayStatus),
-        "values_list": enum_to_list(LoanDisplayStatus)
+        "enum_name": "LoanStatusEnum",
+        "values": enum_to_dict(LoanStatusEnum),
+        "values_list": enum_to_list(LoanStatusEnum)
     }
 
 
@@ -64,11 +64,11 @@ async def get_payment_statuses():
 
 @router.get("/payment-statuses-domain")
 async def get_payment_statuses_domain():
-    """Get all available payment display statuses from domain model."""
+    """Get all available payment statuses from domain model."""
     return {
-        "enum_name": "PaymentDisplayStatus",
-        "values": enum_to_dict(PaymentDisplayStatus),
-        "values_list": enum_to_list(PaymentDisplayStatus)
+        "enum_name": "PaymentStatusEnum",
+        "values": enum_to_dict(PaymentStatusEnum),
+        "values_list": enum_to_list(PaymentStatusEnum)
     }
 
 
@@ -178,9 +178,9 @@ async def get_all_enums():
     return {
         "loan_types": enum_to_dict(LoanType),
         "loan_statuses": enum_to_dict(LoanStatus),
-        "loan_statuses_domain": enum_to_dict(LoanDisplayStatus),
+        "loan_statuses_domain": enum_to_dict(LoanStatusEnum),
         "payment_statuses": enum_to_dict(PaymentStatus),
-        "payment_statuses_domain": enum_to_dict(PaymentDisplayStatus),
+        "payment_statuses_domain": enum_to_dict(PaymentStatusEnum),
         "goal_types": {
             "SAVINGS": "savings",
             "DEBT_PAYOFF": "debt_payoff",

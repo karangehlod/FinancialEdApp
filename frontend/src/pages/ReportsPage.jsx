@@ -2,15 +2,12 @@ import React, { useEffect, useState } from 'react'
 import { Layout, PageContainer } from '../components/Layout'
 import { useProtectedRoute } from '../hooks/useAuth'
 import { useCurrency } from '../hooks/useCurrency'
-import { Card, Button, LoadingSpinner, EmptyState, Alert } from '../components/UI'
-import { FluidGrid } from '../components/FluidGrid'
-import { StatCard } from '../components/StatCard'
+import { Card, Button, StatCard, LoadingSpinner, EmptyState, Alert } from '../components/UI'
 import {
   useExpenseStore,
   useBudgetStore,
   useGoalStore,
   useLoanStore,
-  useProfileStore,
 } from '../store/index'
 import { motion } from 'framer-motion'
 import {
@@ -31,7 +28,6 @@ export const ReportsPage = () => {
   const { budgets, fetchBudgets, isLoading: budgetsLoading } = useBudgetStore()
   const { goals, fetchGoals, isLoading: goalsLoading } = useGoalStore()
   const { loans, fetchLoans, isLoading: loansLoading } = useLoanStore()
-  const { financialProfile } = useProfileStore()
 
   const [activeTab, setActiveTab] = useState('overview')
   const [dateRange, setDateRange] = useState({ start: '', end: '' })
@@ -142,12 +138,6 @@ export const ReportsPage = () => {
       loanCount: safeLoans.length,
     }
   }, [expenses, budgets, goals, loans])
-
-  // Total income (estimated) — prefer monthly salary from profile if available
-  const totalIncome = React.useMemo(() => {
-    const monthly = parseFloat(financialProfile?.monthly_salary) || 0
-    return monthly
-  }, [financialProfile])
 
   // Group expenses by category with safe calculations
   const expensesByCategory = React.useMemo(() => {
@@ -279,6 +269,7 @@ export const ReportsPage = () => {
         title="Financial Reports"
         subtitle="Analyze your financial data and track progress"
         icon={BarChart3}
+        iconSize={'var(--page-icon-size)'}
         iconAlt="Reports"
         action={
           <div className="flex gap-3">
@@ -345,14 +336,36 @@ export const ReportsPage = () => {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="mb-8"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
         >
-          <FluidGrid min="220px">
-            <StatCard title="Total Expenses" value={formatCurrency(stats.totalExpenses)} icon={BarChart3} className="min-h-[6rem]" />
-            <StatCard title="Total Budgeted" value={formatCurrency(stats.totalBudgeted)} icon={BarChart3} className="min-h-[6rem]" />
-            <StatCard title="Budget Utilization" value={`${Math.round(stats.budgetUtilization)}%`} icon={PieChartIcon} className="min-h-[6rem]" />
-            <StatCard title="Goal Progress" value={formatCurrency(stats.goalProgress)} icon={BarChart3} className="min-h-[6rem]" />
-          </FluidGrid>
+          <StatCard
+            title="Total Expenses"
+            value={formatCurrency(stats.totalExpenses)}
+            change={`${stats.expenseCount} transactions`}
+            icon={BarChart3}
+            color="red"
+          />
+          <StatCard
+            title="Total Budgeted"
+            value={formatCurrency(stats.totalBudgeted)}
+            change={`${stats.budgetCount} budgets`}
+            icon={BarChart3}
+            color="blue"
+          />
+          <StatCard
+            title="Budget Utilization"
+            value={`${Math.round(stats.budgetUtilization)}%`}
+            change={stats.budgetUtilization > 100 ? 'Over budget' : 'On track'}
+            icon={PieChartIcon}
+            color={stats.budgetUtilization > 100 ? 'red' : 'green'}
+          />
+          <StatCard
+            title="Goal Progress"
+            value={formatCurrency(stats.goalProgress)}
+            change={`${stats.goalCount} goals`}
+            icon={BarChart3}
+            color="purple"
+          />
         </motion.div>
 
         {/* Tabs */}
@@ -382,25 +395,33 @@ export const ReportsPage = () => {
             {activeTab === 'overview' && (
               <div className="space-y-6">
                 <Card className="p-6">
-                  <h3 className="text-heading-lg font-semibold text-gray-900 dark:text-gray-100 mb-6">Summary</h3>
-                  <FluidGrid min="240px" className="gap-6">
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-6">Summary</h3>
+                  <div className="grid grid-cols-2 gap-6">
                     <div>
-                      <p className="text-sm-fluid text-gray-600 dark:text-gray-400 mb-2">Total Income (Estimated)</p>
-                      <p className="text-value font-bold text-green-600 dark:text-green-400">{formatCurrency(totalIncome)}</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Total Income (Estimated)</p>
+                      <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                        {formatCurrency(stats.totalBudgeted)}
+                      </p>
                     </div>
                     <div>
-                      <p className="text-sm-fluid text-gray-600 dark:text-gray-400 mb-2">Total Spending</p>
-                      <p className="text-value font-bold text-red-600 dark:text-red-400">{formatCurrency(stats.totalExpenses)}</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Total Spending</p>
+                      <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+                        {formatCurrency(stats.totalExpenses)}
+                      </p>
                     </div>
                     <div>
-                      <p className="text-sm-fluid text-gray-600 dark:text-gray-400 mb-2">Remaining Budget</p>
-                      <p className="text-value font-bold text-blue-600 dark:text-blue-400">{formatCurrency(Math.max(0, stats.totalBudgeted - stats.totalExpenses))}</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Remaining Budget</p>
+                      <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                        {formatCurrency(Math.max(0, stats.totalBudgeted - stats.totalExpenses))}
+                      </p>
                     </div>
                     <div>
-                      <p className="text-sm-fluid text-gray-600 dark:text-gray-400 mb-2">Debt (Loans)</p>
-                      <p className="text-value font-bold text-orange-600 dark:text-orange-400">{formatCurrency(stats.totalLoans)}</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Debt (Loans)</p>
+                      <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                        {formatCurrency(stats.totalLoans)}
+                      </p>
                     </div>
-                  </FluidGrid>
+                  </div>
                 </Card>
               </div>
             )}
@@ -408,7 +429,7 @@ export const ReportsPage = () => {
             {activeTab === 'expenses' && (
               <div className="space-y-6">
                 <Card className="p-6">
-                  <h3 className="text-xl-fluid font-semibold text-gray-900 dark:text-gray-100 mb-6">Recent Transactions</h3>
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-6">Recent Transactions</h3>
                   {expenses && expenses.length > 0 ? (
                     <div className="space-y-4" style={{ maxHeight: 'var(--placeholder-height)', overflowY: 'auto' }}>
                       {[...expenses]
@@ -418,11 +439,11 @@ export const ReportsPage = () => {
                           <div key={expense.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                             <div>
                               <p className="font-medium text-gray-900 dark:text-gray-100">{expense.description}</p>
-                              <p className="text-sm-fluid text-gray-600 dark:text-gray-400">{formatDate(expense.date)}</p>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">{formatDate(expense.date)}</p>
                             </div>
                             <div className="text-right">
                               <p className="font-semibold text-gray-900 dark:text-gray-100">{formatCurrency(expense.amount)}</p>
-                              <p className="text-xs-fluid text-gray-600 dark:text-gray-400">{expense.category}</p>
+                              <p className="text-xs text-gray-600 dark:text-gray-400">{expense.category}</p>
                             </div>
                           </div>
                         ))}
@@ -433,7 +454,7 @@ export const ReportsPage = () => {
                 </Card>
 
                 <Card className="p-6">
-                  <h3 className="text-xl-fluid font-semibold text-gray-900 dark:text-gray-100 mb-6">Expenses by Category</h3>
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-6">Expenses by Category</h3>
                   {Object.keys(expensesByCategory).length > 0 ? (
                     <div className="space-y-4">
                       {Object.entries(expensesByCategory)
@@ -446,11 +467,11 @@ export const ReportsPage = () => {
                             <div key={category} className="flex items-center justify-between">
                               <div>
                                 <p className="font-medium text-gray-900 dark:text-gray-100">{category}</p>
-                                <p className="text-sm-fluid text-gray-600 dark:text-gray-400">{count} transactions</p>
+                                <p className="text-sm text-gray-600 dark:text-gray-400">{count} transactions</p>
                               </div>
                               <div className="text-right">
                                 <p className="font-semibold text-gray-900 dark:text-gray-100">{formatCurrency(amount)}</p>
-                                <p className="text-sm-fluid text-gray-600 dark:text-gray-400">{percentage}%</p>
+                                <p className="text-sm text-gray-600 dark:text-gray-400">{percentage}%</p>
                               </div>
                             </div>
                           )
@@ -462,14 +483,14 @@ export const ReportsPage = () => {
                 </Card>
 
                 <Card className="p-6">
-                  <h3 className="text-xl-fluid font-semibold text-gray-900 dark:text-gray-100 mb-6">Monthly Trend</h3>
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-6">Monthly Trend</h3>
                   {expensesByMonth.length > 0 ? (
                     <div className="space-y-4">
                       {expensesByMonth.map(([month, { amount, count }]) => (
                         <div key={month} className="flex items-center justify-between">
                           <div>
                             <p className="font-medium text-gray-900 dark:text-gray-100">{month}</p>
-                            <p className="text-sm-fluid text-gray-600 dark:text-gray-400">{count} transactions</p>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">{count} transactions</p>
                           </div>
                           <p className="font-semibold text-gray-900 dark:text-gray-100">{formatCurrency(amount)}</p>
                         </div>
@@ -484,8 +505,8 @@ export const ReportsPage = () => {
 
             {activeTab === 'budgets' && (
               <Card className="p-6">
-                <h3 className="text-xl-fluid font-semibold text-gray-900 dark:text-gray-100 mb-2">Budget Status - Current Month</h3>
-                <p className="text-sm-fluid text-gray-600 dark:text-gray-400 mb-6">Showing budgets and expenses for {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}</p>
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">Budget Status - Current Month</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Showing budgets and expenses for {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}</p>
                 {budgets && budgets.length > 0 ? (
                   <div className="space-y-6">
                     {(() => {
@@ -519,9 +540,9 @@ export const ReportsPage = () => {
                               <div className="flex items-center justify-between mb-3">
                                 <div>
                                   <p className="font-medium text-gray-900 dark:text-gray-100 capitalize">{budget?.category || 'N/A'}</p>
-                                  <p className="text-xs-fluid text-gray-600 dark:text-gray-400">{currentMonthExpensesByCategory[categoryKey]?.count || 0} transactions</p>
+                                  <p className="text-xs text-gray-600 dark:text-gray-400">{currentMonthExpensesByCategory[categoryKey]?.count || 0} transactions</p>
                                 </div>
-                                <p className="text-sm-fluid font-semibold text-gray-900 dark:text-gray-100">
+                                <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                                   {formatCurrency(categoryExpenses)} / {formatCurrency(allocated)}
                                 </p>
                               </div>
@@ -561,42 +582,48 @@ export const ReportsPage = () => {
 
             {activeTab === 'debts' && (
               <Card className="p-6">
-                <h3 className="text-heading-lg font-bold text-gray-900 dark:text-gray-100 mb-6">Debts & Loans Report</h3>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Debts & Loans Report</h2>
                 
                 {loans && loans.length > 0 ? (
                   <div className="space-y-6">
                     {/* Summary Cards */}
-                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-                      <FluidGrid min="220px" className="gap-4">
-                        <Card className="bg-blue-50 dark:bg-blue-900/20 p-4">
-                          <p className="text-sm-fluid text-gray-600 dark:text-gray-400 mb-2">Total Loan Amount</p>
-                          <p className="text-value font-bold text-blue-600 dark:text-blue-400">{formatCurrency(
+                    <motion.div
+                      className="grid grid-cols-1 md:grid-cols-3 gap-4"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                    >
+                      <Card className="bg-blue-50 dark:bg-blue-900/20 p-4">
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Total Loan Amount</p>
+                        <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                          {formatCurrency(
                             loans.reduce((sum, l) => sum + (parseFloat(l?.principal_amount) || parseFloat(l?.amount) || 0), 0)
-                          )}</p>
-                        </Card>
-                        
-                        <Card className="bg-yellow-50 dark:bg-yellow-900/20 p-4">
-                          <p className="text-sm-fluid text-gray-600 dark:text-gray-400 mb-2">Total Monthly EMI</p>
-                          <p className="text-value font-bold text-yellow-600 dark:text-yellow-400">{formatCurrency(
+                          )}
+                        </p>
+                      </Card>
+                      
+                      <Card className="bg-yellow-50 dark:bg-yellow-900/20 p-4">
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Total Monthly EMI</p>
+                        <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+                          {formatCurrency(
                             loans.reduce((sum, l) => sum + (parseFloat(l?.emi_amount) || 0), 0)
-                          )}</p>
-                        </Card>
-                        
-                        <Card className="bg-red-50 dark:bg-red-900/20 p-4">
-                          <p className="text-sm-fluid text-gray-600 dark:text-gray-400 mb-2">Number of Loans</p>
-                          <p className="text-value font-bold text-red-600 dark:text-red-400">{loans.length}</p>
-                        </Card>
-                      </FluidGrid>
+                          )}
+                        </p>
+                      </Card>
+                      
+                      <Card className="bg-red-50 dark:bg-red-900/20 p-4">
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Number of Loans</p>
+                        <p className="text-2xl font-bold text-red-600 dark:text-red-400">{loans.length}</p>
+                      </Card>
                     </motion.div>
 
                     {/* Detailed Loan Table */}
                     <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
                       <div className="px-6 py-4 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-                        <h3 className="text-lg-fluid font-semibold text-gray-900 dark:text-gray-100">Loan Details</h3>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Loan Details</h3>
                       </div>
                       
                       <div className="overflow-x-auto">
-                        <table className="w-full text-sm-fluid"> 
+                        <table className="w-full text-sm">
                           <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
                             <tr>
                               <th className="px-6 py-3 text-left font-semibold text-gray-900 dark:text-gray-100">Lender</th>
@@ -612,18 +639,9 @@ export const ReportsPage = () => {
                           <tbody>
                             {loans.map((loan, index) => {
                               const principal = parseFloat(loan?.principal_amount) || parseFloat(loan?.amount) || 0
-                              const outstanding = parseFloat(loan?.outstanding_balance) || principal
                               const emi = parseFloat(loan?.emi_amount) || 0
-                              let remainingMonths = 0
-                              if (Number.isFinite(parseFloat(loan?.remaining_months))) {
-                                remainingMonths = parseInt(loan.remaining_months, 10)
-                              } else if (emi > 0) {
-                                remainingMonths = Math.ceil(outstanding / emi)
-                              } else if (Number.isFinite(parseFloat(loan?.loan_term_months))) {
-                                remainingMonths = parseInt(loan.loan_term_months, 10)
-                              } else {
-                                remainingMonths = 0
-                              }
+                              const outstanding = parseFloat(loan?.outstanding_balance) || principal
+                              const remainingMonths = loan?.loan_term_months || loan?.term_months || 0
                               
                               return (
                                 <tr key={loan?.id || index} className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
@@ -634,7 +652,7 @@ export const ReportsPage = () => {
                                   <td className="hidden sm:table-cell px-6 py-3 text-right text-gray-900 dark:text-gray-100 font-medium whitespace-nowrap">{formatCurrency(emi)}</td>
                                   <td className="hidden sm:table-cell px-6 py-3 text-right text-gray-900 dark:text-gray-100 whitespace-nowrap">{formatCurrency(outstanding)}</td>
                                   <td className="hidden sm:table-cell px-6 py-3 text-right whitespace-nowrap">
-                                    <span className={`px-3 py-1 rounded-full text-sm-fluid ${
+                                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
                                        remainingMonths > 12 
                                          ? 'bg-red-100 text-red-800'
                                          : remainingMonths > 6
@@ -654,24 +672,19 @@ export const ReportsPage = () => {
 
                     {/* Debt-to-Income Analysis */}
                     <Card className="p-6 bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-900/10">
-                      <h3 className="text-lg-fluid font-semibold text-gray-900 dark:text-gray-100 mb-4">Debt Analysis</h3>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Debt Analysis</h3>
                       <div className="space-y-4">
                         <div>
-                          <p className="text-sm-fluid text-gray-600 dark:text-gray-400 mb-2">Total EMI Commitment</p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Total EMI Commitment</p>
                           <p className="text-xl font-bold text-purple-600 dark:text-purple-400">
                             {formatCurrency(loans.reduce((sum, l) => sum + (parseFloat(l?.emi_amount) || 0), 0))} / month
                           </p>
                           <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">This is your fixed monthly loan payment obligation</p>
                         </div>
                         <div className="border-t border-purple-200 dark:border-purple-800 pt-4">
-                          <p className="text-sm-fluid text-gray-600 dark:text-gray-400 mb-2">Interest Rate Range</p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Interest Rate Range</p>
                           <p className="text-lg font-medium text-gray-900 dark:text-gray-100">
-                            {(() => {
-                              const rates = (loans || []).map(l => parseFloat(l?.interest_rate) || 0)
-                              const minRate = rates.length > 0 ? Math.min(...rates) : 0
-                              const maxRate = rates.length > 0 ? Math.max(...rates) : 0
-                              return `${minRate.toFixed(2)}% - ${maxRate.toFixed(2)}%`
-                            })()}
+                            {Math.min(...loans.map(l => parseFloat(l?.interest_rate || 0)), 0).toFixed(2)}% - {Math.max(...loans.map(l => parseFloat(l?.interest_rate || 0)), 0).toFixed(2)}%
                           </p>
                         </div>
                       </div>

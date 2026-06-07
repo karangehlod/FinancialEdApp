@@ -6,7 +6,7 @@ Uses Python's logging module with JSON formatting for structured logs.
 import logging
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Dict
 from pathlib import Path
 
@@ -21,7 +21,7 @@ class JSONFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         """Format log record as JSON."""
         log_data: Dict[str, Any] = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.utcnow().isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
@@ -92,34 +92,24 @@ class StructuredLogger:
 
         self.logger.handle(record)
 
-    def debug(self, message: str, *args, **kwargs) -> None:
-        """Log debug level message. Supports %-style positional args."""
-        if args:
-            message = message % args
+    def debug(self, message: str, **kwargs) -> None:
+        """Log debug level message."""
         self._log(logging.DEBUG, message, extra=kwargs)
 
-    def info(self, message: str, *args, **kwargs) -> None:
-        """Log info level message. Supports %-style positional args."""
-        if args:
-            message = message % args
+    def info(self, message: str, **kwargs) -> None:
+        """Log info level message."""
         self._log(logging.INFO, message, extra=kwargs)
 
-    def warning(self, message: str, *args, **kwargs) -> None:
-        """Log warning level message. Supports %-style positional args."""
-        if args:
-            message = message % args
+    def warning(self, message: str, **kwargs) -> None:
+        """Log warning level message."""
         self._log(logging.WARNING, message, extra=kwargs)
 
-    def error(self, message: str, *args, exc_info: bool = False, **kwargs) -> None:
-        """Log error level message. Supports %-style positional args."""
-        if args:
-            message = message % args
+    def error(self, message: str, exc_info: bool = False, **kwargs) -> None:
+        """Log error level message."""
         self._log(logging.ERROR, message, exc_info=exc_info, extra=kwargs)
 
-    def critical(self, message: str, *args, exc_info: bool = False, **kwargs) -> None:
-        """Log critical level message. Supports %-style positional args."""
-        if args:
-            message = message % args
+    def critical(self, message: str, exc_info: bool = False, **kwargs) -> None:
+        """Log critical level message."""
         self._log(logging.CRITICAL, message, exc_info=exc_info, extra=kwargs)
 
 

@@ -145,30 +145,6 @@ async def send_verification_email_task(
     return {"sent": ok}
 
 
-async def send_password_reset_task(
-    ctx: dict,
-    user_id: str,
-    user_email: str,
-    reset_url: str,
-) -> dict:
-    """Send a password reset email asynchronously."""
-    from app.services.email_service import get_email_service
-    email_svc = get_email_service()
-    ok = await email_svc.send_generic_email(
-        to_email=user_email,
-        subject="Reset your FinancialEdApp password",
-        title="Password Reset Request",
-        message=(
-            "We received a request to reset your password. "
-            "This link expires in 1 hour. If you did not request this, ignore this email."
-        ),
-        action_url=reset_url,
-        action_text="Reset Password",
-    )
-    logger.info("Password reset email %s for user %s", "sent" if ok else "failed", user_id)
-    return {"sent": ok}
-
-
 async def process_recurring_expenses_task(ctx: dict) -> dict:
     """
     Daily cron: generate recurring expense instances for today.
@@ -297,7 +273,6 @@ class WorkerSettings:
         send_loan_reminder_task,
         send_goal_milestone_task,
         send_verification_email_task,
-        send_password_reset_task,
         process_recurring_expenses_task,
         send_loan_reminders_cron_task,
         refresh_exchange_rates_task,         # P2-7

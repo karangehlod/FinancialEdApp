@@ -3,30 +3,24 @@
 from typing import Generic, TypeVar, Optional, List, Any
 from abc import ABC, abstractmethod
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 
 from app.core.exceptions import AppException, DatabaseError
 
-# T is kept for CRUDService[T] — a typed CRUD base. BaseService itself
-# is a plain behaviour mixin and does not use T directly.
 T = TypeVar('T')
 logger = logging.getLogger(__name__)
 
 
-class BaseService(ABC):
+class BaseService(ABC, Generic[T]):
     """
-    Abstract base service (behaviour mixin) providing:
-    - Structured logging via log_operation / log_error
-    - Standardised exception handling via handle_error
+    Abstract base service class providing:
+    - Common logging functionality
+    - Exception handling patterns
     - Audit trail support
-    - Service initialisation validation
-
+    - Service initialization validation
+    
     All domain services should inherit from this class to ensure
     consistency in error handling, logging, and cross-cutting concerns.
-
-    Note: Generic[T] was intentionally removed — BaseService is a behaviour
-    mixin, not a generic container. Use CRUDService[T] when a typed primary
-    model type is needed.
     """
     
     def __init__(self):
@@ -52,15 +46,15 @@ class BaseService(ABC):
         context = {
             "service": self._service_name,
             "operation": operation,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.utcnow().isoformat(),
         }
-
+        
         if details:
             context.update(details)
-
+        
         log_func = getattr(self.logger, level, self.logger.info)
         log_func(f"{operation}", extra=context)
-
+    
     def log_error(
         self,
         operation: str,
@@ -69,7 +63,7 @@ class BaseService(ABC):
     ) -> None:
         """
         Log an error with full context.
-
+        
         Args:
             operation: Name of the operation that failed
             error: The exception that occurred
@@ -80,7 +74,7 @@ class BaseService(ABC):
             "operation": operation,
             "error": str(error),
             "error_type": type(error).__name__,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.utcnow().isoformat(),
         }
         
         if details:
@@ -131,13 +125,12 @@ class BaseService(ABC):
         pass
 
 
-class CRUDService(BaseService, Generic[T]):
+class CRUDService(BaseService[T]):
     """
-    Typed base service for CRUD operations.
-
+    Base service for CRUD operations.
+    
     Provides common patterns for Create, Read, Update, Delete operations
-    with logging, error handling, and validation. Specify T as the primary
-    SQLAlchemy model type (e.g. ``CRUDService[Expense]``).
+    with logging, error handling, and validation.
     """
     
     @abstractmethod

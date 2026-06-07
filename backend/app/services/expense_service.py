@@ -2,7 +2,7 @@
 
 from typing import Optional, List, Dict, Any
 from uuid import UUID
-from datetime import date, timezone
+from datetime import date
 from decimal import Decimal
 from calendar import monthrange
 
@@ -19,16 +19,11 @@ from app.core.exceptions import (
 )
 from app.core.logging import get_logger
 from app.repositories.expense_repository import ExpenseRepository
-from app.core.cache_decorator import cache_response, expense_list_key
-from app.core.cache_service import CacheTTL
-from app.core.transaction_decorators import transactional, with_retry, with_deadlock_recovery
-from app.services.service_interfaces import IExpenseService
-from app.services.base_service import BaseService
 
 logger = get_logger(__name__)
 
 
-class ExpenseService(BaseService, IExpenseService):
+class ExpenseService:
     """
     Service for expense CRUD and business logic operations.
 
@@ -37,9 +32,6 @@ class ExpenseService(BaseService, IExpenseService):
     - Business logic (validation, budget updates)
     - Coordination between repositories and other services
     - Cache invalidation on every mutating operation (P0-9)
-
-    Inherits BaseService for structured logging and standardised error
-    handling (log_operation / handle_error / log_error).
 
     Uses the Repository Pattern for data access abstraction.
     Instance-based design supports dependency injection and testing.
@@ -53,21 +45,12 @@ class ExpenseService(BaseService, IExpenseService):
             db:            Async SQLAlchemy session.
             cache_service: Optional CacheService for Redis invalidation.
         """
-        super().__init__()  # Initialise BaseService logger + service name
         self.db = db
         self.repository = ExpenseRepository(db)
         self._cache = cache_service  # May be None or NullCacheService
 
-    async def validate_dependencies(self) -> bool:
-        """Validate that all required dependencies are available."""
-        if not self.repository:
-            raise DatabaseError("ExpenseRepository not initialised")
-        return True
-
     # ============== INSTANCE METHODS ==============
 
-    @transactional(rollback_on_error=True)
-    @with_retry(max_attempts=3, backoff="exponential")
     async def create_expense(
         self,
         user_id: UUID,
@@ -94,49 +77,18 @@ class ExpenseService(BaseService, IExpenseService):
             raise
         except Exception as exc:
             await self.db.rollback()
-            # Use BaseService structured error logging
-            self.log_error("create_expense", exc, {"user_id": str(user_id)})
+            logger.error(f"Expense creation failed: {exc}", exc_info=True)
             raise DatabaseError(f"Failed to create expense: {exc}") from exc
 
         # Cache invalidation is non-fatal — happens outside the transaction
         await self._invalidate_expense_cache(user_id)
-        self.log_operation("create_expense_success", {"user_id": str(user_id)})
+        logger.info(f"Expense created successfully for user {user_id}")
         return new_expense
 
     async def get_expense(self, expense_id: UUID, user_id: UUID) -> Optional[Expense]:
         """Get a specific expense by ID."""
         return await self.repository.get_by_id(expense_id, user_id)
 
-    def _serialize_expenses(self, expenses: list[Expense], total_count: int) -> dict:
-        """Convert expenses list + total count into a JSON-serialisable dict."""
-        return {
-            "total": total_count,
-            "items": [
-                {
-                    "id": str(e.id),
-                    "user_id": str(e.user_id),
-                    "amount": float(e.amount),
-                    "date": e.date.isoformat(),
-                    "category": e.category,
-                    "description": e.description,
-                }
-                for e in expenses
-            ],
-        }
-
-    def _deserialize_expenses(self, data: dict):
-        """Reconstruct (expenses, total) from cached dict. Returns simple dicts not model instances."""
-        items = data.get("items", [])
-        # Note: we return dicts, not SQLAlchemy models — callers should work with serialised data
-        return items, data.get("total", 0)
-
-    @cache_response(
-        ttl=CacheTTL.EXPENSE_LIST,
-        key_func=expense_list_key,
-        serializer_attr="_serialize_expenses",
-        deserializer_attr="_deserialize_expenses",
-        namespace="expenses",
-    )
     async def get_user_expenses(
         self,
         user_id: UUID,
@@ -145,11 +97,8 @@ class ExpenseService(BaseService, IExpenseService):
         filters: Optional[ExpenseFilter] = None,
     ) -> tuple[List[Expense], int]:
         """Get all expenses for a user with optional filtering."""
-        expenses, total = await self.repository.get_by_user(user_id, skip, limit, filters)
-        return expenses, total
+        return await self.repository.get_by_user(user_id, skip, limit, filters)
 
-    @transactional(rollback_on_error=True)
-    @with_retry(max_attempts=3, backoff="exponential")
     async def update_expense(
         self,
         expense_id: UUID,
@@ -191,7 +140,7 @@ class ExpenseService(BaseService, IExpenseService):
                         current.user_id, current.category, current.date
                     )
                 await self.db.commit()
-        except (InvalidExpenseAmountError, InvalidExpenseDateError, ValueError, ExpenseNotFoundError):
+        except (InvalidExpenseAmountError, InvalidExpenseDateError, ValueError):
             raise
         except Exception as exc:
             await self.db.rollback()
@@ -201,7 +150,6 @@ class ExpenseService(BaseService, IExpenseService):
         await self._invalidate_expense_cache(user_id)
         return updated
 
-    @transactional(rollback_on_error=True)
     async def delete_expense(self, expense_id: UUID, user_id: UUID) -> bool:
         """Delete an expense, recalculate budgets, and invalidate cache."""
         try:

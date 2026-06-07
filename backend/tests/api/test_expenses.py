@@ -36,7 +36,7 @@ class TestCreateExpense:
     def test_create_expense_success(self, client):
         """Test successful expense creation."""
         response = client.post(
-            "/api/v1/expenses",
+            "/api/v1/expenses/",
             json={
                 "category": "Food",
                 "amount": 250.0,
@@ -50,7 +50,7 @@ class TestCreateExpense:
     def test_create_expense_missing_amount(self, client):
         """Test creating expense without amount."""
         response = client.post(
-            "/api/v1/expenses",
+            "/api/v1/expenses/",
             json={
                 "category": "Food",
                 "date": "2025-01-15",
@@ -63,7 +63,7 @@ class TestCreateExpense:
     def test_create_expense_missing_category(self, client):
         """Test creating expense without category."""
         response = client.post(
-            "/api/v1/expenses",
+            "/api/v1/expenses/",
             json={
                 "amount": 250.0,
                 "date": "2025-01-15",
@@ -76,7 +76,7 @@ class TestCreateExpense:
     def test_create_expense_missing_date(self, client):
         """Test creating expense without date."""
         response = client.post(
-            "/api/v1/expenses",
+            "/api/v1/expenses/",
             json={
                 "category": "Food",
                 "amount": 250.0,
@@ -89,7 +89,7 @@ class TestCreateExpense:
     def test_create_expense_negative_amount(self, client):
         """Test creating expense with negative amount."""
         response = client.post(
-            "/api/v1/expenses",
+            "/api/v1/expenses/",
             json={
                 "category": "Food",
                 "amount": -250.0,
@@ -102,7 +102,7 @@ class TestCreateExpense:
     def test_create_expense_zero_amount(self, client):
         """Test creating expense with zero amount."""
         response = client.post(
-            "/api/v1/expenses",
+            "/api/v1/expenses/",
             json={
                 "category": "Food",
                 "amount": 0,
@@ -115,7 +115,7 @@ class TestCreateExpense:
     def test_create_expense_with_tags(self, client):
         """Test creating expense with tags."""
         response = client.post(
-            "/api/v1/expenses",
+            "/api/v1/expenses/",
             json={
                 "category": "Food",
                 "amount": 250.0,
@@ -129,7 +129,7 @@ class TestCreateExpense:
     def test_create_expense_with_very_large_amount(self, client):
         """Test creating expense with very large amount."""
         response = client.post(
-            "/api/v1/expenses",
+            "/api/v1/expenses/",
             json={
                 "category": "Food",
                 "amount": 9999999.99,
@@ -143,7 +143,7 @@ class TestCreateExpense:
         """Test creating expense with future date."""
         future_date = (date.today() + timedelta(days=10)).isoformat()
         response = client.post(
-            "/api/v1/expenses",
+            "/api/v1/expenses/",
             json={
                 "category": "Food",
                 "amount": 250.0,
@@ -162,7 +162,7 @@ class TestGetExpenses:
     def test_get_all_expenses(self, client):
         """Test retrieving all expenses."""
         response = client.get(
-            "/api/v1/expenses",
+            "/api/v1/expenses/",
             headers={"Authorization": "Bearer invalid_token"}
         )
         assert response.status_code in [200, 401, 403]
@@ -170,7 +170,7 @@ class TestGetExpenses:
     def test_get_expenses_with_category_filter(self, client):
         """Test retrieving expenses with category filter."""
         response = client.get(
-            "/api/v1/expenses?category=Food",
+            "/api/v1/expenses/?category=Food",
             headers={"Authorization": "Bearer invalid_token"}
         )
         assert response.status_code in [200, 401, 403]
@@ -178,7 +178,7 @@ class TestGetExpenses:
     def test_get_expenses_with_date_range(self, client):
         """Test retrieving expenses with date range."""
         response = client.get(
-            "/api/v1/expenses?start_date=2025-01-01&end_date=2025-01-31",
+            "/api/v1/expenses/?start_date=2025-01-01&end_date=2025-01-31",
             headers={"Authorization": "Bearer invalid_token"}
         )
         assert response.status_code in [200, 401, 403]
@@ -186,7 +186,7 @@ class TestGetExpenses:
     def test_get_expenses_with_multiple_filters(self, client):
         """Test retrieving expenses with multiple filters."""
         response = client.get(
-            "/api/v1/expenses?category=Food&start_date=2025-01-01&end_date=2025-01-31",
+            "/api/v1/expenses/?category=Food&start_date=2025-01-01&end_date=2025-01-31",
             headers={"Authorization": "Bearer invalid_token"}
         )
         assert response.status_code in [200, 401, 403]
@@ -194,7 +194,7 @@ class TestGetExpenses:
     def test_get_expenses_pagination(self, client):
         """Test expense pagination."""
         response = client.get(
-            "/api/v1/expenses?skip=0&limit=10",
+            "/api/v1/expenses/?skip=0&limit=10",
             headers={"Authorization": "Bearer invalid_token"}
         )
         assert response.status_code in [200, 401, 403]
@@ -396,7 +396,7 @@ class TestExpenseEdgeCases:
     def test_expense_with_very_small_amount(self, client):
         """Test creating expense with very small amount."""
         response = client.post(
-            "/api/v1/expenses",
+            "/api/v1/expenses/",
             json={
                 "category": "Food",
                 "amount": 0.01,
@@ -409,7 +409,7 @@ class TestExpenseEdgeCases:
     def test_expense_with_decimal_precision(self, client):
         """Test expense with high decimal precision."""
         response = client.post(
-            "/api/v1/expenses",
+            "/api/v1/expenses/",
             json={
                 "category": "Food",
                 "amount": 250.999,
@@ -422,7 +422,7 @@ class TestExpenseEdgeCases:
     def test_expense_with_very_long_description(self, client):
         """Test expense with very long description."""
         response = client.post(
-            "/api/v1/expenses",
+            "/api/v1/expenses/",
             json={
                 "category": "Food",
                 "amount": 250.0,
@@ -436,7 +436,7 @@ class TestExpenseEdgeCases:
     def test_expense_with_many_tags(self, client):
         """Test expense with many tags."""
         response = client.post(
-            "/api/v1/expenses",
+            "/api/v1/expenses/",
             json={
                 "category": "Food",
                 "amount": 250.0,
@@ -450,7 +450,7 @@ class TestExpenseEdgeCases:
     def test_get_expenses_with_invalid_date_range(self, client):
         """Test getting expenses with invalid date range."""
         response = client.get(
-            "/api/v1/expenses?start_date=2025-02-01&end_date=2025-01-01",
+            "/api/v1/expenses/?start_date=2025-02-01&end_date=2025-01-01",
             headers={"Authorization": "Bearer invalid_token"}
         )
         assert response.status_code in [200, 401, 403, 400]
@@ -458,7 +458,7 @@ class TestExpenseEdgeCases:
     def test_get_expenses_with_invalid_date_format(self, client):
         """Test getting expenses with invalid date format."""
         response = client.get(
-            "/api/v1/expenses?start_date=invalid-date",
+            "/api/v1/expenses/?start_date=invalid-date",
             headers={"Authorization": "Bearer invalid_token"}
         )
         assert response.status_code in [400, 401, 403, 200, 422]
@@ -491,7 +491,7 @@ class TestExpenseHTTPMethods:
     def test_expenses_get_allowed(self, client):
         """Test that GET is allowed for expenses list."""
         response = client.get(
-            "/api/v1/expenses",
+            "/api/v1/expenses/",
             headers={"Authorization": "Bearer invalid_token"}
         )
         assert response.status_code in [200, 401, 403]
@@ -499,7 +499,7 @@ class TestExpenseHTTPMethods:
     def test_expenses_post_allowed(self, client):
         """Test that POST is allowed for creating expenses."""
         response = client.post(
-            "/api/v1/expenses",
+            "/api/v1/expenses/",
             json={
                 "category": "Food",
                 "amount": 250.0,

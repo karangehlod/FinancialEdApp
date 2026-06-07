@@ -42,7 +42,6 @@ from app.repositories.oauth_account_repository import OAuthAccountRepository
 from app.repositories.refresh_token_repository import RefreshTokenRepository
 from app.repositories.user_repository import UserRepository
 from app.services.base_service import BaseService
-from app.utils.datetime_utils import utcnow_naive
 
 logger = logging.getLogger(__name__)
 
@@ -387,7 +386,7 @@ class OAuthService(BaseService):
         """
         import jwt as pyjwt
 
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         payload = {
             "iss": settings.APPLE_TEAM_ID,
             "iat": now,
@@ -457,7 +456,7 @@ class OAuthService(BaseService):
         enc_refresh = _encrypt(refresh_token) if refresh_token else None
         expires_at: Optional[datetime] = None
         if token_expires_in:
-            expires_at = utcnow_naive() + timedelta(seconds=token_expires_in)
+            expires_at = datetime.utcnow() + timedelta(seconds=token_expires_in)
 
         # 1. Existing OAuth link
         existing_oauth = await self.oauth_repo.get_by_provider(provider, provider_uid)
@@ -541,7 +540,7 @@ class OAuthService(BaseService):
             data={"sub": str(user.id), "type": "refresh"},
         )
         token_hash = _sha256(refresh_token)
-        expires_at = utcnow_naive() + timedelta(seconds=_REFRESH_TOKEN_TTL_SECONDS)
+        expires_at = datetime.utcnow() + timedelta(seconds=_REFRESH_TOKEN_TTL_SECONDS)
         await self.refresh_token_repo.create(
             user_id=user.id,
             token_hash=token_hash,

@@ -3,7 +3,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID
-from datetime import datetime, timezone
+from datetime import datetime
 
 from app.repositories.user_repository import UserRepository
 from app.schemas.auth import UserCreate
@@ -152,9 +152,9 @@ class TestUpdateLastLogin:
         mock_result.scalar_one_or_none = MagicMock(return_value=sample_user)
         mock_db.execute = AsyncMock(return_value=mock_result)
         
-        before = datetime.now(timezone.utc).replace(tzinfo=None)
+        before = datetime.utcnow()
         await repo.update_last_login(sample_user.id)
-        after = datetime.now(timezone.utc).replace(tzinfo=None)
+        after = datetime.utcnow()
         
         assert sample_user.last_login is not None
         assert before <= sample_user.last_login <= after

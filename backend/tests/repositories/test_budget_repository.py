@@ -336,23 +336,19 @@ class TestBudgetRepository:
     
     @pytest.mark.asyncio
     async def test_delete_budget_success(self, budget_repo, user_id, budget_id, sample_budget):
-        """Test soft-deleting a budget successfully."""
+        """Test deleting a budget successfully."""
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = sample_budget
         budget_repo.db.execute = AsyncMock(return_value=mock_result)
-
-        budget_repo.db.add = MagicMock()
-        budget_repo.db.flush = AsyncMock()
+        
+        budget_repo.db.delete = AsyncMock()
         budget_repo.db.commit = AsyncMock()
-
+        
         result = await budget_repo.delete(budget_id, user_id)
-
+        
         assert result is True
-        # Soft delete: db.add() is called (not db.delete()) and commit follows
-        budget_repo.db.add.assert_called_once()
+        budget_repo.db.delete.assert_called_once()
         budget_repo.db.commit.assert_called_once()
-        # The budget should be marked as deleted
-        assert sample_budget.is_deleted
     
     @pytest.mark.asyncio
     async def test_delete_budget_not_found(self, budget_repo, user_id, budget_id):

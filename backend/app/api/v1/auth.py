@@ -18,8 +18,6 @@ from app.core.logging import get_logger
 from app.core.provider_implementations import BcryptPasswordHasher, JWTTokenProvider
 from app.config import settings
 from app.dependencies import get_current_user, get_redis_cache, get_password_hasher, get_token_provider
-from app.core.validation import validate_password
-from app.utils.sanitize import clean_text
 
 
 # ── Pydantic request bodies for new P1 endpoints ──────────────────────────────
@@ -59,18 +57,6 @@ def get_auth_service(
         password_hasher=password_hasher,
         token_provider=token_provider,
         refresh_token_repository=refresh_token_repo,
-        cache=cache,
-    )
-
-
-def _get_verification_service(
-    auth_db: AsyncSession = Depends(get_auth_db),
-    token_provider: JWTTokenProvider = Depends(get_token_provider),
-    cache=Depends(get_redis_cache),
-) -> VerificationTokenService:
-    """Build a VerificationTokenService per request."""
-    return VerificationTokenService(
-        token_provider=token_provider,
         cache=cache,
     )
 
@@ -756,9 +742,103 @@ async def refresh_token(
 # P1-2: Email Verification + Password Reset
 # ---------------------------------------------------------------------------
 
+def _get_verification_service(
+    request: Request,
+    token_provider: JWTTokenProvider = Depends(get_token_provider),
+    cache=Depends(get_redis_cache),
+) -> VerificationTokenService:
+    """Build a VerificationTokenService per request (token_provider is a singleton)."""
+    return VerificationTokenService(token_provider=token_provider, cache=cache)
+
+
+@router.post(
+    "/verify-email",
+    status_code=status.HTTP_200_OK,
+    tags=["Authentication"],
+    summary="Verify email address with a one-time token",
+)
+async def verify_email(
+    body: VerifyEmailRequest,
+    auth_db: AsyncSession = Depends(get_auth_db),
+    verification_service: VerificationTokenService = Depends(_get_verification_service),
+):
+    """
+    Verify a user's email address using the token sent to their inbox.
+
+    The token is single-use and expires in 1 hour.
+
+    **Request body:**
+    - **token**: The JWT token from the verification email link.
+
+    **Errors:**
+    - **400**: Invalid, expired, or already-used token.
+    """
+    try:
+        user_id = await verification_service.consume_verification_token(body.token)
+    except AuthenticationError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    # Mark user as verified in the DB
+    user_repo = UserRepository(auth_db)
+    user = await user_repo.get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if not user.is_verified:
+        user.is_verified = True
+        await auth_db.commit()
+        logger.info("Email verified for user %s", user_id)
+
+    return {"success": True, "message": "Email verified successfully"}
+
+
+@router.post(
+    "/resend-verification",
+    status_code=status.HTTP_202_ACCEPTED,
+    tags=["Authentication"],
+    summary="Resend email verification link",
+)
+async def resend_verification(
+    body: ForgotPasswordRequest,
+    background_tasks: BackgroundTasks,
+    auth_db: AsyncSession = Depends(get_auth_db),
+    verification_service: VerificationTokenService = Depends(_get_verification_service),
+):
+    """
+    Resend the email verification link.
+
+    Rate-limited to 3 requests per email per hour.
+    Returns 202 even if the email is not found (prevents user enumeration).
+    """
+    user_repo = UserRepository(auth_db)
+    user = await user_repo.get_user_by_email(body.email)
+
+    if user and not user.is_verified:
+        try:
+            token = await verification_service.create_verification_token(user.id, user.email)
+            # Send email in background — never block the response
+            from app.services.email_service import get_email_service
+            email_svc = get_email_service()
+            verify_url = f"{settings.FRONTEND_URL}/verify-email?token={token}"
+            background_tasks.add_task(
+                email_svc.send_generic_email,
+                to_email=user.email,
+                subject="Verify your FinancialEdApp account",
+                title="Email Verification",
+                message=f"Click the link below to verify your email address.",
+                action_url=verify_url,
+                action_text="Verify Email",
+            )
+        except AuthenticationError:
+            # Rate limited — still return 202 to prevent enumeration
+            pass
+
+    return {"success": True, "message": "If that email exists and is unverified, a link has been sent"}
+
+
 @router.post(
     "/forgot-password",
-    status_code=status.HTTP_200_OK,
+    status_code=status.HTTP_202_ACCEPTED,
     tags=["Authentication"],
     summary="Request a password reset email",
 )
@@ -767,109 +847,91 @@ async def forgot_password(
     background_tasks: BackgroundTasks,
     auth_db: AsyncSession = Depends(get_auth_db),
     verification_service: VerificationTokenService = Depends(_get_verification_service),
-    email_service=Depends(lambda: None),  # Will be resolved from app.state if needed
 ):
     """
-    Request a password reset email.
+    Send a password reset email.
 
-    An email with a one-time reset link will be sent if the email exists.
     Rate-limited to 3 requests per email per hour.
+    Always returns 202 (even if email not found) to prevent user enumeration.
 
     **Request body:**
-    - **email**: The email address to send the reset link to.
-
-    **Response:**
-    Always returns success (for security, we don't leak whether email exists).
+    - **email**: The account email address.
     """
-    email = body.email.lower().strip()
-    logger.info("Forgot password request: %s", email)
-
-    # Check if user exists (but don't leak this to the client)
     user_repo = UserRepository(auth_db)
-    user = await user_repo.get_user_by_email(email)
-    
-    # Rate limiting happens inside create_password_reset_token
-    try:
-        if user:
-            token = await verification_service.create_password_reset_token(user.id, user.email)
-            
-            # Send email in background
-            async def send_reset_email():
-                try:
-                    reset_link = f"{settings.FRONTEND_URL}/reset-password?token={token}"
-                    subject = "Password Reset Request"
-                    html_content = f"""
-                    <html>
-                        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-                            <h2>Password Reset Request</h2>
-                            <p>Hi {user.email},</p>
-                            <p>Click the link below to reset your password. This link expires in 1 hour.</p>
-                            <p><a href="{reset_link}" style="background-color: #1976d2; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Reset Password</a></p>
-                            <p>If you didn't request this, ignore this email.</p>
-                        </body>
-                    </html>
-                    """
-                    from app.services.email_service import EmailService
-                    email_svc = EmailService()
-                    await email_svc.send_email(user.email, subject, html_content)
-                except Exception as exc:
-                    logger.error("Failed to send password reset email: %s", exc)
-            
-            background_tasks.add_task(send_reset_email)
-    except AuthenticationError as exc:
-        # Rate limit exceeded — don't leak this to the client
-        logger.warning("Forgot password rate limit exceeded: %s", email)
-        pass
+    user = await user_repo.get_user_by_email(body.email)
 
-    # Always return success for security
-    return {"success": True, "message": "If an account with that email exists, a password reset link will be sent."}
+    if user and user.is_active:
+        try:
+            token = await verification_service.create_password_reset_token(user.id, user.email)
+            from app.services.email_service import get_email_service
+            email_svc = get_email_service()
+            reset_url = f"{settings.FRONTEND_URL}/reset-password?token={token}"
+            background_tasks.add_task(
+                email_svc.send_generic_email,
+                to_email=user.email,
+                subject="Reset your FinancialEdApp password",
+                title="Password Reset Request",
+                message=(
+                    "We received a request to reset your password. "
+                    "This link expires in 1 hour. If you did not request this, ignore this email."
+                ),
+                action_url=reset_url,
+                action_text="Reset Password",
+            )
+            logger.info("Password reset email queued for user %s", user.id)
+        except AuthenticationError:
+            # Rate limited — log but don't reveal to caller
+            logger.warning("Password reset rate limit hit for email %s", body.email)
+
+    return {"success": True, "message": "If that email is registered, a password reset link has been sent"}
 
 
 @router.post(
-    "/verify-email",
+    "/reset-password",
     status_code=status.HTTP_200_OK,
     tags=["Authentication"],
-    summary="Verify email using a one-time token",
+    summary="Reset password using a one-time token",
 )
-async def verify_email(
-    body: VerifyEmailRequest,
+async def reset_password(
+    body: ResetPasswordRequest,
     auth_db: AsyncSession = Depends(get_auth_db),
     verification_service: VerificationTokenService = Depends(_get_verification_service),
+    password_hasher: BcryptPasswordHasher = Depends(get_password_hasher),
 ):
     """
-    Verify a user's email address using the token from the verification email.
+    Reset a user's password using the token from the reset email.
 
     The token is single-use and expires in 1 hour.
+    All active sessions are revoked after a successful reset.
 
     **Request body:**
-    - **token**: The JWT token from the verification email link.
-
-    **Response:**
-    Returns success and the verified user information.
+    - **token**: The JWT token from the reset email link.
+    - **new_password**: The new password (minimum 8 characters).
     """
+    # Validate new password length before touching the DB
+    if len(body.new_password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Password must be at least 8 characters",
+        )
+
     try:
-        user_id = await verification_service.consume_verification_token(body.token)
+        user_id = await verification_service.consume_password_reset_token(body.token)
     except AuthenticationError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
     user_repo = UserRepository(auth_db)
     user = await user_repo.get_user_by_id(user_id)
-    if not user:
+    if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    # Mark user as verified
-    user.is_verified = True
-    await user_repo.update(user)
-    logger.info("Email verified for user: %s", user_id)
+    new_hash = password_hasher.hash_password(body.new_password)
+    await user_repo.update_password(user_id, new_hash)
 
-    return {
-        "success": True,
-        "message": "Email verified successfully",
-        "user": {
-            "id": str(user.id),
-            "email": user.email,
-            "is_verified": user.is_verified,
-        },
-    }
+    # Revoke all existing refresh tokens — force re-login everywhere
+    from app.repositories.refresh_token_repository import RefreshTokenRepository
+    rt_repo = RefreshTokenRepository(auth_db)
+    revoked = await rt_repo.revoke_all_for_user(user_id)
+    logger.info("Password reset: revoked %d sessions for user %s", revoked, user_id)
 
-
+    return {"success": True, "message": "Password reset successfully. Please log in with your new password."}

@@ -98,7 +98,7 @@ class TestCreateLoan:
                 mock_user.return_value = MagicMock(id=uuid.uuid4())
                 with patch("app.api.v1.loans.get_data_db") as mock_db:
                     response = client.post(
-                        "/api/v1/loans",
+                        "/api/v1/loans/",
                         json={
                             "principal_amount": 500000.0,
                             "interest_rate": 8.5,
@@ -118,7 +118,7 @@ class TestCreateLoan:
         with patch("app.api.v1.loans.get_current_user") as mock_user:
             mock_user.return_value = MagicMock(id=uuid.uuid4())
             response = client.post(
-                "/api/v1/loans",
+                "/api/v1/loans/",
                 json={
                     "interest_rate": 8.5,
                     "tenure_months": 120,
@@ -134,7 +134,7 @@ class TestCreateLoan:
     def test_create_loan_missing_interest_rate(self, client):
         """Test loan creation without interest rate."""
         response = client.post(
-            "/api/v1/loans",
+            "/api/v1/loans/",
             json={
                 "principal_amount": 500000.0,
                 "tenure_months": 120,
@@ -149,7 +149,7 @@ class TestCreateLoan:
     def test_create_loan_invalid_amount(self, client):
         """Test loan creation with invalid amount."""
         response = client.post(
-            "/api/v1/loans",
+            "/api/v1/loans/",
             json={
                 "principal_amount": -500000.0,  # Negative amount
                 "interest_rate": 8.5,
@@ -165,7 +165,7 @@ class TestCreateLoan:
     def test_create_loan_zero_amount(self, client):
         """Test loan creation with zero amount."""
         response = client.post(
-            "/api/v1/loans",
+            "/api/v1/loans/",
             json={
                 "principal_amount": 0,
                 "interest_rate": 8.5,
@@ -181,7 +181,7 @@ class TestCreateLoan:
     def test_create_loan_invalid_interest_rate(self, client):
         """Test loan creation with negative interest rate."""
         response = client.post(
-            "/api/v1/loans",
+            "/api/v1/loans/",
             json={
                 "principal_amount": 500000.0,
                 "interest_rate": -8.5,  # Negative rate
@@ -197,7 +197,7 @@ class TestCreateLoan:
     def test_create_loan_invalid_tenure(self, client):
         """Test loan creation with invalid tenure."""
         response = client.post(
-            "/api/v1/loans",
+            "/api/v1/loans/",
             json={
                 "principal_amount": 500000.0,
                 "interest_rate": 8.5,
@@ -213,7 +213,7 @@ class TestCreateLoan:
     def test_create_loan_zero_tenure(self, client):
         """Test loan creation with zero tenure."""
         response = client.post(
-            "/api/v1/loans",
+            "/api/v1/loans/",
             json={
                 "principal_amount": 500000.0,
                 "interest_rate": 8.5,
@@ -235,7 +235,7 @@ class TestGetLoans:
     def test_get_all_loans(self, client):
         """Test getting all loans."""
         response = client.get(
-            "/api/v1/loans",
+            "/api/v1/loans/",
             headers={"Authorization": "Bearer invalid_token"}
         )
         # Should return 401 due to auth, or 200 with empty list
@@ -244,7 +244,7 @@ class TestGetLoans:
     def test_get_loans_with_status_filter(self, client):
         """Test getting loans with status filter."""
         response = client.get(
-            "/api/v1/loans?status=active",
+            "/api/v1/loans/?status=active",
             headers={"Authorization": "Bearer invalid_token"}
         )
         assert response.status_code in [200, 401, 403]
@@ -252,7 +252,7 @@ class TestGetLoans:
     def test_get_loans_with_status_closed(self, client):
         """Test getting loans with closed status filter."""
         response = client.get(
-            "/api/v1/loans?status=closed",
+            "/api/v1/loans/?status=closed",
             headers={"Authorization": "Bearer invalid_token"}
         )
         assert response.status_code in [200, 401, 403]
@@ -260,7 +260,7 @@ class TestGetLoans:
     def test_get_loans_with_invalid_status(self, client):
         """Test getting loans with invalid status."""
         response = client.get(
-            "/api/v1/loans?status=invalid_status",
+            "/api/v1/loans/?status=invalid_status",
             headers={"Authorization": "Bearer invalid_token"}
         )
         # Should either filter or return 200
@@ -707,7 +707,7 @@ class TestLoanEdgeCases:
     def test_create_loan_method_not_allowed_get(self, client):
         """Test that GET is not allowed for create endpoint."""
         response = client.get(
-            "/api/v1/loans",
+            "/api/v1/loans/",
             headers={"Authorization": "Bearer invalid_token"}
         )
         # GET should be allowed for list
@@ -747,7 +747,7 @@ class TestLoanEdgeCases:
     def test_very_large_loan_amount(self, client):
         """Test creating loan with very large amount."""
         response = client.post(
-            "/api/v1/loans",
+            "/api/v1/loans/",
             json={
                 "principal_amount": 999999999999.99,
                 "interest_rate": 8.5,
@@ -763,7 +763,7 @@ class TestLoanEdgeCases:
     def test_very_high_interest_rate(self, client):
         """Test creating loan with very high interest rate."""
         response = client.post(
-            "/api/v1/loans",
+            "/api/v1/loans/",
             json={
                 "principal_amount": 500000.0,
                 "interest_rate": 99.99,
@@ -779,7 +779,7 @@ class TestLoanEdgeCases:
     def test_very_long_tenure(self, client):
         """Test creating loan with very long tenure."""
         response = client.post(
-            "/api/v1/loans",
+            "/api/v1/loans/",
             json={
                 "principal_amount": 500000.0,
                 "interest_rate": 8.5,
@@ -870,7 +870,7 @@ class TestHTTPMethodValidation:
     def test_loans_list_post_allowed(self, client):
         """Test that POST is allowed for creating loans."""
         response = client.post(
-            "/api/v1/loans",
+            "/api/v1/loans/",
             json={
                 "principal_amount": 500000.0,
                 "interest_rate": 8.5,

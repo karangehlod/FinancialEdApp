@@ -298,8 +298,8 @@ async def verify_2fa(
 
     # Try TOTP first
     if totp_service.verify_code(secret, payload.code):
-        from app.utils.datetime_utils import utcnow_naive
-        user.totp_last_used_at = utcnow_naive()
+        from datetime import datetime, timezone
+        user.totp_last_used_at = datetime.now(timezone.utc)
         await db.commit()
         return TwoFactorVerifyResponse(verified=True, message="2FA verification successful.")
 

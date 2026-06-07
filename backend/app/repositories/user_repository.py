@@ -4,12 +4,12 @@ from typing import Optional, Union
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from datetime import datetime
 
 from app.repositories.interfaces import IUserRepository
-from app.utils.datetime_utils import utcnow_naive
 from app.db.models.auth import User
 from app.schemas.auth import UserCreate
-from app.core.security_compat import hash_password as get_password_hash  # compat alias
+from app.utils.security import get_password_hash
 
 
 class UserRepository(IUserRepository):
@@ -64,7 +64,7 @@ class UserRepository(IUserRepository):
         user = result.scalar_one_or_none()
         
         if user:
-            user.last_login = utcnow_naive()
+            user.last_login = datetime.utcnow()
             await self.db.commit()
     
     async def delete_user(self, user_id: UUID) -> bool:
@@ -89,7 +89,7 @@ class UserRepository(IUserRepository):
         
         if user:
             user.password_hash = new_password_hash
-            user.updated_at = utcnow_naive()
+            user.updated_at = datetime.utcnow()
             await self.db.commit()
             return True
         return False

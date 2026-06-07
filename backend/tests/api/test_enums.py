@@ -40,7 +40,7 @@ class TestLoanEnums:
         assert data["enum_name"] == "LoanStatus"
         assert "ACTIVE" in data["values"]
         assert "CLOSED" in data["values"]
-        assert data["values"]["ACTIVE"] == "active"
+        assert data["values"]["ACTIVE"] == "Active"
 
     def test_get_loan_statuses_domain(self, client):
         """Test getting domain loan statuses."""
@@ -48,7 +48,7 @@ class TestLoanEnums:
         assert response.status_code == 200
         
         data = response.json()
-        assert data["enum_name"] == "LoanDisplayStatus"
+        assert data["enum_name"] == "LoanStatusEnum"
         assert "ACTIVE" in data["values"]
         assert "OVERDUE" in data["values"]
 
@@ -68,7 +68,7 @@ class TestLoanEnums:
         assert response.status_code == 200
         
         data = response.json()
-        assert data["enum_name"] == "PaymentDisplayStatus"
+        assert data["enum_name"] == "PaymentStatusEnum"
         assert "PAID" in data["values"]
         assert "OVERDUE" in data["values"]
 

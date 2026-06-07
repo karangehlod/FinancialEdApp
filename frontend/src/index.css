@@ -1,5 +1,3 @@
-@import './styles/fluid-tokens.css';
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -23,8 +21,6 @@ body {
   background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
   min-height: 100vh;
   transition: background-color 0.3s ease, color 0.3s ease;
-  /* remove outer gutter so page can be full-bleed; internal components will use --page-gutter */
-  padding: 0;
 }
 
 /* Dark mode base styles */
@@ -62,13 +58,8 @@ html.dark body {
     border: 1px solid rgba(71, 85, 105, 0.3);
   }
 
-  /* Use explicit CSS for gradient-text to avoid @apply linting and ensure cross-browser support */
   .gradient-text {
-    background: linear-gradient(90deg, #2563eb 0%, #0284c7 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    color: transparent;
+    @apply bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent;
   }
 }
 
@@ -134,111 +125,83 @@ select {
 
 /* Responsive CSS variables for UI sizing */
 :root {
-  /* Typography base */
-  --font-base: clamp(0.88rem, 1.2vw + 0.5rem, 1rem); /* fluid base font */
+  /* Typography (responsive using clamp) */
+  --font-xxl: clamp(1.5rem, 3.2vw + 0.2rem, 2.5rem); /* headings / hero */
+  --font-xl:  clamp(1.25rem, 2.2vw + 0.15rem, 1.75rem); /* primary large text */
+  --font-lg:  clamp(1rem, 1.6vw + 0.1rem, 1.125rem); /* body large */
+  --font-sm:  clamp(0.75rem, 0.9vw, 0.9375rem); /* small text / captions */
 
-  /* Fluid header height: scales smoothly between small and large viewports */
-  --header-height: clamp(44px, calc(3.2vw + 18px), 80px);
+  /* Spacing system */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: clamp(0.5rem, 0.8vw, 1rem);
+  --spacing-lg: clamp(0.75rem, 1.2vw, 1.5rem);
 
-  /* Derived tokens */
+  /* Button paddings (vertical horizontal) - responsive */
+  --btn-padding: clamp(0.375rem, 0.8vw, 0.9rem) clamp(0.75rem, 1.2vw, 1.25rem);
+
+  /* Spinner sizes */
+  --spinner-sm: 1.5rem;
+  --spinner-md: 2rem;
+  --spinner-lg: 2.5rem;
+
+  /* Button paddings and font sizes (legacy fallbacks kept for components using them) */
+  --btn-sm-px: 0.75rem;
+  --btn-sm-py: 0.375rem;
+  --btn-sm-font: 0.875rem;
+
+  --btn-md-px: 1rem;
+  --btn-md-py: 0.5rem;
+  --btn-md-font: 1rem;
+
+  --btn-lg-px: 1.5rem;
+  --btn-lg-py: 0.75rem;
+  --btn-lg-font: 1.125rem;
+
+  /* Input paddings and font */
+  --input-px: 0.75rem;
+  --input-py: 0.5rem;
+  --input-font: 0.9375rem;
+
+  /* Modal sizing */
+  --modal-max-width: 90%;
+  --modal-padding-x: 1rem;
+  --modal-padding-y: 1rem;
+
+  /* Icon sizes */
+  --icon-sm: 1.25rem;
+  --icon-md: 1.5rem;
+  --icon-lg: 2rem;
+
+  /* Header / sidebar brand height - single source of truth for top header and sidebar logo sizing */
+  --header-height: 56px;
+
+  /* Sidebar brand sizing derived from header height */
   --sidebar-brand-height: var(--header-height);
-  --sidebar-logo-size: calc(var(--header-height) * 0.9);
+  /* Make logo match header height so it's visually aligned */
+  --sidebar-logo-size: var(--header-height);
   --sidebar-title-size: calc(var(--sidebar-brand-height) * 0.45);
   --sidebar-subtitle-size: calc(var(--sidebar-brand-height) * 0.18);
 
-  /* Icon sizes derived from header height */
-  --icon-lg: calc(var(--header-height) * 0.32);
-  --icon-md: calc(var(--icon-lg) * 0.7);
-  --icon-sm: calc(var(--icon-md) * 0.75);
+  /* Page container icon default: derive from heading size so logo feels proportional to title */
+  --page-icon-size: clamp(48px, calc(var(--font-xxl) * 2.2), 160px);
+  /* Hero/login-register logo size: slightly larger relative to hero font */
+  --page-hero-icon-size: clamp(72px, calc(var(--font-xxl) * 3.5), 260px);
 
-  /* Page icons (reduced defaults to avoid oversized page headers) */
-  --page-icon-size: clamp(32px, calc(var(--header-height) * 0.95), 120px);
-  --page-hero-icon-size: clamp(48px, calc(var(--header-height) * 1.25), 180px);
+  /* Header gap - used by PageContainer for consistent spacing between logo and title */
+  --header-gap: 0.75rem; /* default */
 
-  /* Spacing derived from header height */
-  --header-gap: calc(var(--header-height) * 0.08);
-  --spacing-md: calc(var(--header-height) * 0.12);
+  /* Progress bar height */
+  --progress-height: 0.5rem;
 
-  --progress-height: clamp(8px, calc(var(--header-height) * 0.06), 18px);
+  /* Page content max width (use for central cards/forms) */
+  --content-max-width: 90%;
 
-  --card-padding: clamp(0.75rem, calc(var(--header-height) * 0.11), 1.5rem);
+  /* Background decorative blob size */
+  --bg-blob-size: 24rem;
 
-  /* Smaller default large heading scale to keep headers compact */
-  --font-xl: clamp(1rem, 1.2vw + 0.2rem, 1.25rem);
-
-  /* Small adaptive page gutter for minimal body padding (approx 1-2px on small viewports) */
-  --page-gutter: clamp(1px, 0.35vw, 8px);
-}
-
-/* Utility to apply token-driven padding */
-.pad-md { padding: var(--card-padding) !important; }
-
-/* Fluid heading utilities built from --font-base */
-.text-xl-fluid { font-size: calc(var(--font-base) * 1.25) !important; }
-.text-2xl-fluid { font-size: calc(var(--font-base) * 1.5) !important; }
-.text-3xl-fluid { font-size: calc(var(--font-base) * 2) !important; }
-
-/* Icon utility classes */
-.icon-sm { width: var(--icon-sm); height: var(--icon-sm); display: inline-flex; align-items: center; justify-content: center; }
-.icon-md { width: var(--icon-md); height: var(--icon-md); display: inline-flex; align-items: center; justify-content: center; }
-.icon-lg { width: var(--icon-lg); height: var(--icon-lg); display: inline-flex; align-items: center; justify-content: center; }
-
-/* Fluid text utilities */
-.text-xs-fluid { font-size: calc(var(--font-base) * 0.8); }
-.text-sm-fluid { font-size: calc(var(--font-base) * 0.9); }
-.text-base-fluid { font-size: var(--font-base); }
-.text-lg-fluid { font-size: calc(var(--font-base) * 1.15); }
-
-/* Token-driven utilities (priority over Tailwind size utilities) */
-.text-heading-lg { font-size: var(--font-xl, 1.5rem) !important; }
-.text-value { font-size: calc(var(--font-base) * 1.75) !important; }
-.text-stat { font-size: calc(var(--font-base) * 2) !important; font-weight: 700 !important; }
-
-/* Fluid button utility mapping to design tokens */
-.btn-fluid { font-size: var(--btn-md-font, 0.875rem) !important; padding: var(--btn-md-py, 0.5rem) var(--btn-md-px, 1rem) !important; }
-
-/* Input utility */
-.input-fluid { font-size: var(--input-font, 0.875rem) !important; padding: var(--input-py, 0.625rem) var(--input-px, 0.75rem) !important; }
-
-/* Header responsive padding: vertical padding proportional to header height */
-.app-header {
-  height: var(--header-height);
-  display: flex;
-  align-items: center;
-  padding-left: calc(var(--header-height) * 0.13);
-  padding-right: calc(var(--header-height) * 0.13);
-  box-sizing: border-box;
-}
-
-/* Ensure header inner wrapper keeps spacing */
-.app-header-inner { display:flex; align-items:center; justify-content:space-between; width:100%; }
-
-/* Sidebar brand matches header height */
-.sidebar-brand {
-  height: var(--header-height);
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  padding-left: calc(var(--header-height) * 0.12);
-  padding-right: calc(var(--header-height) * 0.12);
-  gap: calc(var(--header-gap) * 0.6);
-}
-
-/* Brand text sizing */
-.brand-text h1 { font-size: var(--sidebar-title-size); margin: 0; }
-.brand-text p { font-size: var(--sidebar-subtitle-size); margin: 0; }
-
-/* Ensure logo scales proportionally */
-.sidebar-logo { width: var(--sidebar-logo-size); height: var(--sidebar-logo-size); object-fit: contain; }
-
-/* Hero logo styles for auth pages — use design tokens so logo scales fluidly */
-.hero-logo {
-  width: calc(var(--page-hero-icon-size) * 0.8);
-  height: calc(var(--page-hero-icon-size) * 0.8);
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  display: inline-block;
+  /* Placeholder height for content placeholders (used by charts/loading states) */
+  --placeholder-height: 24rem; /* default for placeholders (matches h-96) */
 }
 
 /* Small screens and up (sm) */
@@ -259,9 +222,9 @@ select {
     --spacing-md: 1rem;
     --spacing-lg: 1.25rem;
 
-    /* Slightly reduced page icon sizes compared to previous defaults */
-    --page-icon-size: clamp(48px, calc(var(--font-xxl, 1.6rem) * 2.0), 120px);
-    --page-hero-icon-size: clamp(72px, calc(var(--font-xxl, 1.6rem) * 2.8), 180px);
+    /* Scale up page icon sizes slightly on small screens */
+    --page-icon-size: clamp(56px, calc(var(--font-xxl) * 2.1), 140px);
+    --page-hero-icon-size: clamp(88px, calc(var(--font-xxl) * 3.2), 220px);
     --header-gap: 1.1rem;
   }
 }
@@ -278,13 +241,13 @@ select {
      --content-max-width: 768px;
      --bg-blob-size: 30rem;
 
-     /* Slightly reduced font scales to keep page headers compact */
-     --font-xxl: clamp(1.6rem, 2.4vw + 0.3rem, 2.2rem);
-     --font-xl: clamp(1.15rem, 1.6vw + 0.25rem, 1.6rem);
+     /* Increase font scales slightly on larger screens */
+     --font-xxl: clamp(1.75rem, 2.8vw + 0.4rem, 2.75rem);
+     --font-xl: clamp(1.3rem, 1.8vw + 0.3rem, 1.9rem);
 
-     /* Moderated page icon sizes */
-     --page-icon-size: clamp(56px, calc(var(--font-xxl) * 1.8), 120px);
-     --page-hero-icon-size: clamp(84px, calc(var(--font-xxl) * 2.2), 180px);
+     /* Larger page icons on medium+ screens */
+     --page-icon-size: clamp(64px, calc(var(--font-xxl) * 1.9), 140px);
+     --page-hero-icon-size: clamp(100px, calc(var(--font-xxl) * 2.8), 220px);
      --header-gap: 1.3rem;
    }
 }
@@ -304,9 +267,9 @@ select {
 
      --spacing-lg: 1.5rem;
 
-     /* Desktop sizes (kept conservative to avoid oversized headers) */
-     --page-icon-size: clamp(60px, calc(var(--font-xxl, 2rem) * 1.7), 140px);
-     --page-hero-icon-size: clamp(96px, calc(var(--font-xxl, 2rem) * 2.0), 200px);
+     /* Desktop sizes */
+     --page-icon-size: clamp(72px, calc(var(--font-xxl) * 1.8), 160px);
+     --page-hero-icon-size: clamp(120px, calc(var(--font-xxl) * 2.6), 260px);
      --header-gap: 1.6rem;
    }
 }
@@ -316,39 +279,20 @@ select {
   :root { --sidebar-logo-size: var(--header-height); }
 }
 
-/* Fluid container utility: centers content and scales padding/max-width fluidly without hard breakpoints.
-   - Uses viewport-relative padding and a conservative max-width for readability.
-   - Keeps layout proportional at ANY viewport width. */
-.fluid-container {
-  width: 100%;
-  margin-left: auto;
-  margin-right: auto;
-  padding-left: clamp(0.75rem, 2.5vw, 2rem);
-  padding-right: clamp(0.75rem, 2.5vw, 2rem);
-  /* Allow the container to grow but never exceed a readable width and always keep some viewport breathing room */
-  max-width: min(1200px, 96vw);
-  box-sizing: border-box;
-}
-
-/* Fluid grid utility for card collections.
-   - Uses auto-fit + minmax so cards wrap naturally and scale between a minimum comfortable size and equal distribution.
-   - Gap scales smoothly with viewport. */
-.fluid-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: clamp(0.5rem, 1.5vw, 1.5rem);
-  align-items: start;
-}
-
-/* Replace rigid .stats-grid column layout with fluid auto-fit behavior so stats reflow continuously. */
+/* Dashboard stats grid: default stacked, on large screens use custom percentage columns */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: clamp(0.5rem, 1.2vw, 1rem);
-  align-items: stretch;
+  grid-template-columns: 1fr;
 }
 
-/* Ensure StatCard expands to fill their grid cell (keeps earlier behavior) */
+@media (min-width: 1024px) {
+  .stats-grid {
+    grid-template-columns: 35% 35% 15% 15%;
+    align-items: stretch;
+  }
+}
+
+/* Ensure StatCard expands to fill their grid cell */
 .stats-grid > * {
   min-width: 0;
   display: flex; /* make child flex so inner card can stretch */
@@ -391,9 +335,9 @@ select {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  padding-left: calc(var(--header-height) * 0.12);
-  padding-right: calc(var(--header-height) * 0.12);
-  gap: calc(var(--header-gap) * 0.6);
+  padding-left: var(--spacing-md);
+  padding-right: var(--spacing-md);
+  gap: calc(var(--header-gap) * 0.5);
 }
 
 .brand-text {
@@ -427,8 +371,8 @@ select {
 
 /* Ensure the logo matches header height and preserves aspect ratio */
 .sidebar-logo {
-  width: var(--sidebar-logo-size);
-  height: var(--sidebar-logo-size);
+  width: calc(var(--header-height) * 0.9);
+  height: calc(var(--header-height) * 0.9);
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
@@ -441,328 +385,3 @@ select {
 
 /* Make the brand gap consistent */
 .sidebar-brand > img + div { margin-left: 0; }
-
-/* Header icon containment — prevent icons from overflowing header and ensure consistent rendering */
-.app-header .icon-sm,
-.app-header .icon-md,
-.app-header .icon-lg {
-  max-width: calc(var(--header-height) * 0.9);
-  max-height: calc(var(--header-height) * 0.9);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  line-height: 0;
-}
-
-/* Ensure any stray text nodes or characters inside header icon wrappers are hidden (e.g. stray + / -).
-   Avoid setting color:transparent on the wrapper because many SVG icons rely on currentColor for stroke/fill.
-   Instead collapse text nodes (font-size:0) and explicitly hide any non-SVG children so SVGs remain visible. */
-.app-header .icon-sm,
-.app-header .icon-md,
-.app-header .icon-lg {
-  font-size: 0 !important; /* collapse text nodes */
-  line-height: 0 !important;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Hide any non-SVG children (text nodes or accidental DOM elements) while preserving the SVG itself */
-.app-header .icon-sm > :not(svg),
-.app-header .icon-md > :not(svg),
-.app-header .icon-lg > :not(svg) {
-  display: none !important;
-  visibility: hidden !important;
-  width: 0 !important;
-  height: 0 !important;
-  overflow: hidden !important;
-}
-
-/* Ensure SVGs keep using currentColor for stroke/fill and fill the wrapper */
-.app-header .icon-sm > svg,
-.app-header .icon-md > svg,
-.app-header .icon-lg > svg {
-  display: block !important;
-  width: 100% !important;
-  height: 100% !important;
-  color: inherit !important; /* allow theming via text color */
-}
-
-/* Prevent stacked/duplicated icons inside header/sidebar icon wrappers - keep these defensive rules but rely on hiding non-SVG children above */
-.app-header .icon-sm > svg ~ svg,
-.app-header .icon-md > svg ~ svg,
-.app-header .icon-lg > svg ~ svg {
-  display: none !important;
-  width: 0 !important;
-  height: 0 !important;
-  visibility: hidden !important;
-  opacity: 0 !important;
-}
-
-/* Hide any nested icon wrapper elements to avoid multiple size classes stacking */
-.app-header .icon-sm .icon-sm,
-.app-header .icon-sm .icon-md,
-.app-header .icon-sm .icon-lg,
-.app-header .icon-md .icon-sm,
-.app-header .icon-md .icon-md,
-.app-header .icon-md .icon-lg,
-.app-header .icon-lg .icon-sm,
-.app-header .icon-lg .icon-md,
-.app-header .icon-lg .icon-lg {
-  display: none !important;
-}
-
-/* Also apply same defensive rules to sidebar nav icon wrappers */
-.sidebar .icon-sm,
-.sidebar .icon-md,
-.sidebar .icon-lg {
-  position: relative;
-}
-.sidebar .icon-sm > svg,
-.sidebar .icon-md > svg,
-.sidebar .icon-lg > svg {
-  display: block !important;
-  width: 100% !important;
-  height: 100% !important;
-}
-.sidebar .icon-sm svg ~ svg,
-.sidebar .icon-md svg ~ svg,
-.sidebar .icon-lg svg ~ svg {
-  display: none !important;
-}
-
-/* Prevent inline utility width/height classes from breaking token-driven icons in core components (Card, Modal, EmptyState, StatCard) */
-.card-icon-wrapper .icon-sm, .card-icon-wrapper .icon-md, .card-icon-wrapper .icon-lg,
-.modal .icon-sm, .modal .icon-md, .modal .icon-lg,
-.empty-state .icon-sm, .empty-state .icon-md, .empty-state .icon-lg {
-  width: var(--icon-md) !important;
-  height: var(--icon-md) !important;
-}
-
-/* Also ensure inputs and buttons scale with base font */
-.input, input, textarea, select, button {
-  font-size: var(--font-base) !important;
-}
-
-/* Ensure modal and card use the same token by default */
-.modal {
-  padding: var(--card-padding);
-}
-
-/* Make sure card content has consistent inner spacing and does not overflow */
-.glass > * { box-sizing: border-box; }
-
-/* Ensure table cells and summary cards use token-driven padding when appropriate */
-.table-pad { padding: calc(var(--card-padding) * 0.9) !important; }
-
-/* Ensure grid children won't overflow due to long text */
-.grid > * { min-width: 0; }
-
-/* Compact auth page styles: reduce hero/logo and form size for Login/Register */
-.auth-hero {
-  /* Reduce vertical spacing around hero */
-  margin-bottom: 1rem;
-}
-.auth-hero .hero-logo {
-  width: calc(var(--page-hero-icon-size) * 0.55) !important;
-  height: calc(var(--page-hero-icon-size) * 0.55) !important;
-  box-shadow: 0 8px 20px rgba(2,6,23,0.06);
-}
-.auth-hero h1 {
-  /* Use slightly smaller heading for auth pages */
-  font-size: calc(var(--font-xl) * 1.05) !important;
-  margin-bottom: 0 !important;
-}
-.auth-hero p {
-  font-size: calc(var(--font-base) * 1) !important;
-  margin-top: 0.25rem !important;
-}
-
-/* Compact auth form: reduce padding and radius to keep forms tighter */
-.auth-form {
-  padding: clamp(1rem, 2.2vw, 1.25rem) !important; /* roughly p-4 / p-5 */
-  border-radius: 0.75rem !important; /* rounded-lg */
-  box-shadow: 0 8px 30px rgba(2,6,23,0.06) !important;
-}
-
-/* Make input sizes a touch smaller inside auth forms */
-.auth-form input,
-.auth-form button {
-  padding-top: 0.6rem !important;
-  padding-bottom: 0.6rem !important;
-}
-
-/* Compact styles for auth pages to reduce vertical real-estate and scrolling */
-.auth-container {
-  /* keep centered but limit width for forms to reduce horizontal/vertical footprint */
-  max-width: min(520px, 92vw);
-  margin-left: auto;
-  margin-right: auto;
-  /* slightly reduced horizontal padding so forms sit tighter to edges */
-  padding-left: clamp(0.5rem, 1.2vw, 0.75rem);
-  padding-right: clamp(0.5rem, 1.2vw, 0.75rem);
-}
-
-.auth-hero {
-  margin-bottom: 0.75rem !important; /* reduce top header spacing */
-}
-
-.auth-hero .hero-logo {
-  /* scale down the hero/logo for auth pages */
-  width: calc(var(--page-hero-icon-size) * 0.55) !important;
-  height: calc(var(--page-hero-icon-size) * 0.55) !important;
-}
-
-.auth-hero h1 {
-  /* smaller heading in auth context */
-  font-size: clamp(1.15rem, 1.6vw + 0.05rem, 1.4rem) !important;
-  margin-bottom: 0 !important;
-}
-
-.auth-hero p {
-  font-size: calc(var(--font-base) * 0.95) !important;
-  margin-top: 0.25rem !important;
-}
-
-.auth-form {
-  /* tighter card padding and reduced gaps to avoid long scroll */
-  padding: calc(var(--spacing-md) * 0.9) !important;
-  gap: 0.6rem !important;
-}
-
-.auth-form .space-y-6 { gap: 0.6rem !important; }
-.auth-form .space-y-5 { gap: 0.5rem !important; }
-
-.auth-form .py-3 { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; }
-
-/* Slightly reduce OAuth button sizes inside auth form if they use block-level classes */
-.auth-form .oauth-row > * {
-  padding-top: 0.6rem !important;
-  padding-bottom: 0.6rem !important;
-}
-
-/* Make footer info less tall on auth pages */
-.auth-container + .mt-8,
-.auth-form + .mt-8 {
-  margin-top: 0.8rem !important;
-}
-
-/* Auth split layout (left: hero, right: form) */
-.auth-split {
-   width: calc(100vw - (var(--page-gutter) * 2));
-   box-sizing: border-box;
-  /* span almost full viewport (tiny outer gutters), remove centering cap so left/right gaps disappear */
-   max-width: 100%;
-   margin: 0;
-   padding-left: var(--page-gutter);
-   padding-right: var(--page-gutter);
-}
-
-/* Mobile auth header (shown only on small screens) */
-.auth-page-header {
-   display: block;
-   width: 100%;
-   padding: 0 var(--page-gutter); /* only horizontal gutter */
-}
-
-.auth-page-header .hero-logo {
-  width: calc(var(--page-hero-icon-size) * 0.9);
-  height: calc(var(--page-hero-icon-size) * 0.9);
-}
-
-@media (min-width: 768px) {
-  .auth-page-header { display: none; }
-
-  /* Make the left column a bounded width so it doesn't expand to fill empty space.
-     Reduce min-height to make the page more compact and form-focused. */
-  .auth-split {
-    display: grid;
-    /* left column grows, right column keeps a comfortable max for form */
-    grid-template-columns: 1fr minmax(300px, 480px);
-    gap: 0.5rem; /* smaller gap to reduce horizontal breathing room */
-    align-items: stretch; /* allow columns to stretch full height */
-    min-height: 32vh; /* make page more compact vertically */
-    /* allow grid to use full width of viewport but keep small inner gutter */
-    padding-left: var(--page-gutter);
-    padding-right: var(--page-gutter);
-    max-width: 100%;
-    margin: 0;
-   }
-
-   .auth-left,
-   .auth-right {
-     display: flex;
-     align-items: stretch;
-     justify-content: center;
-     /* give small inner padding so content doesn't touch the reduced edges */
-     padding: 0.4rem 0.4rem;
-   }
-
-   /* Left hero: prefer content at the top so it doesn't create centered empty space */
-   .auth-left .hero-inner {
-     max-width: 100%;
-     text-align: left;
-     height: 100%;
-     display: flex;
-     flex-direction: column;
-     justify-content: flex-start; /* start instead of center to reduce vertical whitespace */
-     padding-top: 0.5rem;
-   }
-
-   /* Scale down hero logo to keep left column tighter */
-   .auth-left .hero-logo {
-     width: clamp(56px, 12vw, 140px);
-     height: auto;
-     display: inline-flex;
-     align-items: center;
-     justify-content: center;
-   }
-
-   /* Toned-down hero heading size for better balance */
-   .auth-left h1 {
-     /* larger responsive hero heading so left column reads comfortably */
-     font-size: clamp(1.3rem, 2.6vw + 0.2rem, 2rem) !important;
-     line-height: 1.05;
-   }
-   .auth-left p,
-.auth-left .features-list,
-.auth-left .features-list li {
-  font-size: clamp(1rem, 1.4vw + 0.02rem, 1.15rem);
-  margin: 0 0 0.5rem 0;
-   }
-
-   /* Right form constrained and tightened for a compact experience */
-   .auth-right .auth-form {
-     width: clamp(280px, 44vw, 92vw);
-     max-width: 520px;
-     padding: 0.5rem 0.6rem !important; /* slightly smaller vertical padding */
-     box-shadow: var(--card-shadow, 0 8px 20px rgba(2,6,23,0.06));
-     margin: auto;
-     /* max-height: calc(100vh - 8rem); */
-     overflow: visible;
-     font-size: clamp(0.95rem, 1.1vw, 1rem); /* responsive base for the form */
-   }
- }
-
-@media (min-width: 1024px) {
-   .auth-split { grid-template-columns: 1fr minmax(360px, 520px); gap: 0.75rem; min-height: 36vh; padding-left: 0; padding-right: 0; }
-
-   .auth-left .hero-inner { justify-content: flex-start; padding-top: 1.5rem; }
-   .auth-left .hero-logo { width: clamp(64px, 10vw, 140px); }
-   .auth-right .auth-form { padding: 0.55rem 0.65rem !important; }
- }
-
-/* When viewport is wide, keep the centered grid but allow slightly larger max so content doesn't feel cramped */
-@media (min-width: 1200px) {
-  .auth-split { max-width: 1100px; }
- }
-
-/* Final safety: ensure the overall page container doesn't add extra vertical breathing room */
-#root, main, .page, .auth-container { min-height: auto; }
-
-/* Make the right-side auth form non-scrollable: let the page scroll instead of the inner box */
-.auth-right .auth-form {
-  max-height: none !important;
-  overflow: visible !important;
-}

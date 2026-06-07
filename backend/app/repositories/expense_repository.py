@@ -98,11 +98,7 @@ class ExpenseRepository:
         try:
             result = await self.db.execute(
                 select(Expense).where(
-                    and_(
-                        Expense.id == expense_id,
-                        Expense.user_id == user_id,
-                        Expense.is_deleted == False  # P1-7: Filter out soft-deleted
-                    )
+                    and_(Expense.id == expense_id, Expense.user_id == user_id)
                 )
             )
             expense = result.scalar_one_or_none()
@@ -141,12 +137,7 @@ class ExpenseRepository:
             Tuple of (list of Expense objects, total count)
         """
         try:
-            query = select(Expense).where(
-                and_(
-                    Expense.user_id == user_id,
-                    Expense.is_deleted == False  # P1-7: Filter out soft-deleted
-                )
-            )
+            query = select(Expense).where(Expense.user_id == user_id)
             
             # Apply filters
             if filters:
@@ -203,11 +194,7 @@ class ExpenseRepository:
         try:
             result = await self.db.execute(
                 select(Expense).where(
-                    and_(
-                        Expense.id == expense_id,
-                        Expense.user_id == user_id,
-                        Expense.is_deleted == False  # P1-7: Filter out soft-deleted
-                    )
+                    and_(Expense.id == expense_id, Expense.user_id == user_id)
                 )
             )
             expense = result.scalar_one_or_none()
@@ -235,7 +222,7 @@ class ExpenseRepository:
     
     async def delete(self, expense_id: UUID, user_id: UUID) -> bool:
         """
-        Soft delete an expense.
+        Delete an expense.
         
         Args:
             expense_id: UUID of the expense
@@ -251,11 +238,7 @@ class ExpenseRepository:
         try:
             result = await self.db.execute(
                 select(Expense).where(
-                    and_(
-                        Expense.id == expense_id,
-                        Expense.user_id == user_id,
-                        Expense.is_deleted == False  # P1-7: Can only delete active expenses
-                    )
+                    and_(Expense.id == expense_id, Expense.user_id == user_id)
                 )
             )
             expense = result.scalar_one_or_none()
@@ -264,11 +247,10 @@ class ExpenseRepository:
                 logger.warning("Expense not found for deletion")
                 raise ExpenseNotFoundError(str(expense_id))
             
-            # P1-7: Soft delete - mark as deleted without removing from DB
-            expense.soft_delete()
+            await self.db.delete(expense)
             await self.db.commit()
             
-            logger.info(f"Expense soft-deleted: {expense_id}")
+            logger.info(f"Expense deleted: {expense_id}")
             return True
         except ExpenseNotFoundError:
             raise
@@ -317,8 +299,7 @@ class ExpenseRepository:
                 and_(
                     Expense.user_id == user_id,
                     Expense.date >= start_date,
-                    Expense.date <= end_date,
-                    Expense.is_deleted == False  # P1-7: Filter out soft-deleted
+                    Expense.date <= end_date
                 )
             )
             
@@ -361,8 +342,7 @@ class ExpenseRepository:
                     and_(
                         Expense.user_id == user_id,
                         Expense.date >= start_date,
-                        Expense.date <= end_date,
-                        Expense.is_deleted == False  # P1-7: Filter out soft-deleted
+                        Expense.date <= end_date
                     )
                 ).order_by(Expense.date)
             )
@@ -394,8 +374,7 @@ class ExpenseRepository:
             query = select(Expense).where(
                 and_(
                     Expense.user_id == user_id,
-                    Expense.category == category,
-                    Expense.is_deleted == False  # P1-7: Filter out soft-deleted
+                    Expense.category == category
                 )
             )
             

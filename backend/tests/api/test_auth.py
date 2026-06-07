@@ -4,77 +4,9 @@ from unittest.mock import AsyncMock, MagicMock, patch, Mock
 from datetime import datetime, timedelta
 import uuid
 
-from fastapi.testclient import TestClient
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-
 from app.schemas.auth import UserRegister, UserLogin, TokenResponse
 from app.core.exceptions import UserAlreadyExistsError, AuthenticationError
 from app.db.models.auth import User
-from app.main import app
-from app.db.session import get_auth_db, get_data_db, AuthBase, DataBase
-from app.dependencies import get_redis_cache
-
-
-# ---------------------------------------------------------------------------
-# Auth-specific client fixture — does NOT override get_current_user so that
-# authentication tests actually exercise the real auth middleware.
-# ---------------------------------------------------------------------------
-
-@pytest.fixture(scope="function")
-def client():
-    """
-    TestClient for auth tests.
-
-    * In-memory SQLite for both databases (no real Postgres needed)
-    * Redis replaced with a no-op mock (no real Redis needed)
-    * get_current_user is NOT overridden — auth tests must pass real tokens
-    * No pre-set Authorization header — tests that need a token add it manually
-    """
-    import asyncio
-
-    # Build auth DB
-    auth_engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
-    data_engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
-
-    loop = asyncio.new_event_loop()
-
-    async def _setup():
-        async with auth_engine.begin() as conn:
-            await conn.run_sync(AuthBase.metadata.create_all)
-        async with data_engine.begin() as conn:
-            await conn.run_sync(DataBase.metadata.create_all)
-
-    loop.run_until_complete(_setup())
-
-    AuthSession = async_sessionmaker(auth_engine, class_=AsyncSession, expire_on_commit=False)
-    DataSession = async_sessionmaker(data_engine, class_=AsyncSession, expire_on_commit=False)
-
-    mock_cache = MagicMock()
-    mock_cache.get = AsyncMock(return_value=None)
-    mock_cache.set = AsyncMock(return_value=True)
-    mock_cache.delete = AsyncMock(return_value=True)
-    mock_cache.exists = AsyncMock(return_value=0)
-
-    async def _override_auth_db():
-        async with AuthSession() as session:
-            yield session
-
-    async def _override_data_db():
-        async with DataSession() as session:
-            yield session
-
-    app.dependency_overrides[get_auth_db] = _override_auth_db
-    app.dependency_overrides[get_data_db] = _override_data_db
-    app.dependency_overrides[get_redis_cache] = lambda: mock_cache
-
-    yield TestClient(app, raise_server_exceptions=False)
-
-    for dep in [get_auth_db, get_data_db, get_redis_cache]:
-        app.dependency_overrides.pop(dep, None)
-
-    loop.run_until_complete(auth_engine.dispose())
-    loop.run_until_complete(data_engine.dispose())
-    loop.close()
 
 
 # Test fixtures

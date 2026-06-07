@@ -17,14 +17,14 @@ Feature: User Authentication
       | alice@example.com  | SecurePass123!  |
     When I submit a registration request
     Then the response status should be 201
-    And the response body should contain "email"
-    And the response body should contain "is_active"
+    And the response body should contain "access_token"
+    And the response body should contain "token_type"
 
   Scenario: Registration with duplicate email is rejected
     Given a user already exists with email "bob@example.com"
     When I submit a registration request with email "bob@example.com" and password "AnotherPass456!"
-    Then the response status should be 400
-    And the response body should contain "already registered"
+    Then the response status should be 409
+    And the response body should contain "already exists"
 
   Scenario: Registration with weak password is rejected
     When I submit a registration request with email "charlie@example.com" and password "weak"
@@ -50,7 +50,7 @@ Feature: User Authentication
     Given a verified user exists with email "eve@example.com" and password "CorrectPass123!"
     When I log in with email "eve@example.com" and password "WrongPassword!"
     Then the response status should be 401
-    And the response body should contain "Incorrect email or password"
+    And the response body should contain "Invalid credentials"
 
   Scenario: Login with non-existent email is rejected
     When I log in with email "nobody@example.com" and password "AnyPassword123!"

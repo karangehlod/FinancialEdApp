@@ -4,7 +4,7 @@ import pytest
 from datetime import datetime, timedelta
 from fastapi import HTTPException, status
 from unittest.mock import patch, MagicMock
-from app.core.security_compat import (
+from app.core.security import (
     hash_password,
     verify_password,
     create_access_token,

@@ -9,14 +9,14 @@ The conftest.py in the root still uses SQLite in-memory for fast unit tests.
 
 Environment (set in backend/.env):
   AUTH_DB_HOST=localhost  AUTH_DB_PORT=55432  AUTH_DB_NAME=auth_db
-  DATA_DB_HOST=localhost  DATA_DB_PORT=55433  DATA_DB_NAME=financial_ed_db
+  DATA_DB_HOST=localhost  DATA_DB_PORT=55432  DATA_DB_NAME=financial_ed_db
   REDIS_URL=redis://:finedu_redis_password@localhost:56379/0
 """
 import uuid
 import pytest
 import pytest_asyncio
 import httpx
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import AsyncGenerator
 
@@ -29,7 +29,7 @@ from app.config import settings
 from app.db.session import AuthBase, DataBase
 from app.db.models.auth import User
 from app.db.models.data import UserProfile
-from app.core.security_compat import hash_password
+from app.core.security import hash_password
 
 
 # ---------------------------------------------------------------------------
@@ -122,8 +122,8 @@ async def make_user(auth_db: AsyncSession, data_db: AsyncSession):
             password_hash=hash_password(password),
             is_active=is_active,
             is_verified=is_verified,
-            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
-            updated_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
         )
         auth_db.add(user)
         await auth_db.flush()  # get the PK without committing
@@ -135,7 +135,7 @@ async def make_user(auth_db: AsyncSession, data_db: AsyncSession):
             country="IN",
             currency="INR",
             consent_given=True,
-            consent_timestamp=datetime.now(timezone.utc).replace(tzinfo=None),
+            consent_timestamp=datetime.utcnow(),
         )
         data_db.add(profile)
         await data_db.flush()
@@ -151,7 +151,7 @@ async def make_user(auth_db: AsyncSession, data_db: AsyncSession):
 def _mint_token(user_id: uuid.UUID, minutes: int = 60) -> str:
     payload = {
         "sub": str(user_id),
-        "exp": datetime.now(timezone.utc) + timedelta(minutes=minutes),
+        "exp": datetime.utcnow() + timedelta(minutes=minutes),
         "type": "access",
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)

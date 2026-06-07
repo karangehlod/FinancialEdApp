@@ -1,12 +1,10 @@
 """Loan management schemas."""
-from pydantic import BaseModel, Field, validator, field_validator
+from pydantic import BaseModel, Field, validator
 from typing import Optional, List, Dict
 from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 from enum import Enum
-
-from app.core.sanitization import sanitize_name, sanitize_notes
 
 
 class LoanType(str, Enum):
@@ -158,19 +156,7 @@ class LoanBase(BaseModel):
     emi_amount: Optional[Decimal] = Field(None, ge=0, decimal_places=2)
     start_date: date
     description: Optional[str] = Field(None, max_length=500)
-
-    @field_validator("lender_name", mode="before")
-    @classmethod
-    def clean_lender_name(cls, v: Optional[str]) -> Optional[str]:
-        """Strip HTML and normalise unicode from lender name."""
-        return sanitize_name(v) if v else v
-
-    @field_validator("description", mode="before")
-    @classmethod
-    def clean_description(cls, v: Optional[str]) -> Optional[str]:
-        """Strip HTML from loan description."""
-        return sanitize_notes(v) if v else v
-
+    
     @validator('emi_amount', pre=True, always=True)
     def calculate_emi_if_not_provided(cls, v, values):
         """Calculate EMI if not provided."""
@@ -206,18 +192,6 @@ class LoanUpdate(BaseModel):
     status: Optional[LoanStatus] = None
     description: Optional[str] = Field(None, max_length=500)
     start_date: Optional[date] = None
-
-    @field_validator("lender_name", mode="before")
-    @classmethod
-    def clean_lender_name(cls, v: Optional[str]) -> Optional[str]:
-        """Strip HTML and normalise unicode from lender name."""
-        return sanitize_name(v) if v else v
-
-    @field_validator("description", mode="before")
-    @classmethod
-    def clean_description(cls, v: Optional[str]) -> Optional[str]:
-        """Strip HTML from loan description."""
-        return sanitize_notes(v) if v else v
 
 
 class LoanResponse(LoanBase):

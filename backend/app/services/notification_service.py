@@ -1,7 +1,7 @@
 """Notification service for managing in-app and email notifications."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import List, Optional
 from decimal import Decimal
 from sqlalchemy import select, and_, or_, func
@@ -10,8 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models.data import Notification
 from app.core.logging import get_logger
 from app.core.exceptions import ResourceNotFoundError
-from app.core.transaction_decorators import transactional, with_retry
-from app.utils.datetime_utils import utcnow_naive
 
 logger = get_logger(__name__)
 
@@ -23,8 +21,6 @@ class NotificationService:
         """Initialize notification service."""
         self.db_session = db_session
 
-    @transactional(rollback_on_error=True)
-    @with_retry(max_attempts=3, backoff="exponential")
     async def create_notification(
         self,
         user_id: str,
@@ -57,8 +53,8 @@ class NotificationService:
             related_resource_id=uuid.UUID(related_resource_id) if related_resource_id else None,
             related_resource_type=related_resource_type,
             is_read=False,
-            created_at=utcnow_naive(),
-            updated_at=utcnow_naive(),
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
         )
 
         self.db_session.add(notification)
@@ -165,7 +161,7 @@ class NotificationService:
         """
         notification = await self.get_notification(notification_id, user_id)
         notification.is_read = True
-        notification.updated_at = utcnow_naive()
+        notification.updated_at = datetime.utcnow()
 
         self.db_session.add(notification)
         await self.db_session.commit()
@@ -199,7 +195,7 @@ class NotificationService:
 
         for notification in notifications:
             notification.is_read = True
-            notification.updated_at = utcnow_naive()
+            notification.updated_at = datetime.utcnow()
 
         self.db_session.add_all(notifications)
         await self.db_session.commit()
@@ -208,7 +204,6 @@ class NotificationService:
 
         return count
 
-    @transactional(rollback_on_error=True)
     async def delete_notification(
         self, notification_id: str, user_id: str
     ) -> bool:
@@ -231,7 +226,6 @@ class NotificationService:
 
         return True
 
-    @transactional(rollback_on_error=True)
     async def delete_old_notifications(
         self, user_id: str, days: int = 30
     ) -> int:
@@ -247,7 +241,7 @@ class NotificationService:
         """
         from datetime import timedelta
 
-        cutoff_date = utcnow_naive() - timedelta(days=days)
+        cutoff_date = datetime.utcnow() - timedelta(days=days)
 
         result = await self.db_session.execute(
             select(Notification).where(

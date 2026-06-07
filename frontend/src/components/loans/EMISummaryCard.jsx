@@ -66,12 +66,12 @@ export const EMISummaryCard = ({ loans = [], currency = 'USD' }) => {
           {/* Header */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 md:p-3 bg-blue-100 dark:bg-blue-800/50 rounded-lg">
-                <Zap className="icon-sm text-blue-600 dark:text-blue-400" />
+              <div className="p-3 bg-blue-100 dark:bg-blue-800/50 rounded-lg">
+                <Zap className="w-6 h-6 text-blue-600 dark:text-blue-400" />
               </div>
               <div>
-                <h3 className="text-sm-fluid font-medium text-gray-600 dark:text-gray-400">Monthly EMI Commitment</h3>
-                <p className="text-xs-fluid text-gray-500 dark:text-gray-500 mt-0.5">
+                <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Monthly EMI Commitment</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-500 mt-0.5">
                   Total from {metrics.loanCount} active loan{metrics.loanCount !== 1 ? 's' : ''}
                 </p>
               </div>
@@ -84,7 +84,7 @@ export const EMISummaryCard = ({ loans = [], currency = 'USD' }) => {
             <p className="font-bold text-blue-900 dark:text-blue-300" style={{ fontSize: 'var(--font-xxl)' }}>
               {formatCurrency(metrics.totalEMI, currency)}
             </p>
-            <p className="text-sm-fluid text-blue-600 dark:text-blue-400 mt-2">
+            <p className="text-sm text-blue-600 dark:text-blue-400 mt-2">
               {metrics.loanCount > 0
                 ? `Paid monthly towards ${metrics.loanCount} loan${metrics.loanCount !== 1 ? 's' : ''}`
                 : 'No active loans'}
@@ -93,24 +93,22 @@ export const EMISummaryCard = ({ loans = [], currency = 'USD' }) => {
 
           {/* Stats Grid */}
           {metrics.loanCount > 0 && (
-            <div className="pt-4 border-t border-blue-200 dark:border-blue-700">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                <div className="text-center">
-                  <p className="text-xs-fluid text-gray-600 dark:text-gray-400 mb-1">Average EMI</p>
-                  <p className="font-semibold text-gray-900 dark:text-gray-100">
-                    {formatCurrency(metrics.averageEMI, currency)}
-                  </p>
-                </div>
-                <div className="text-center">
-                  <p className="text-xs-fluid text-gray-600 dark:text-gray-400 mb-1">Min - Max</p>
-                  <p className="font-semibold text-gray-900 dark:text-gray-100 text-sm-fluid">
-                    {formatCurrency(metrics.minEMI, currency)} - {formatCurrency(metrics.maxEMI, currency)}
-                  </p>
-                </div>
-                <div className="text-center">
-                  <p className="text-xs-fluid text-gray-600 dark:text-gray-400 mb-1">Active Loans</p>
-                  <p className="font-semibold text-gray-900 dark:text-gray-100">{metrics.loanCount}</p>
-                </div>
+            <div className="pt-4 grid grid-cols-3 gap-3 border-t border-blue-200 dark:border-blue-700">
+              <div className="text-center">
+                <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Average EMI</p>
+                <p className="font-semibold text-gray-900 dark:text-gray-100">
+                  {formatCurrency(metrics.averageEMI, currency)}
+                </p>
+              </div>
+              <div className="text-center border-l border-r border-blue-200 dark:border-blue-700">
+                <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Min - Max</p>
+                <p className="font-semibold text-gray-900 dark:text-gray-100 text-sm">
+                  {formatCurrency(metrics.minEMI, currency)} - {formatCurrency(metrics.maxEMI, currency)}
+                </p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Active Loans</p>
+                <p className="font-semibold text-gray-900 dark:text-gray-100">{metrics.loanCount}</p>
               </div>
             </div>
           )}
@@ -118,7 +116,7 @@ export const EMISummaryCard = ({ loans = [], currency = 'USD' }) => {
           {/* Empty State */}
           {metrics.loanCount === 0 && (
             <div className="pt-4 text-center">
-              <p className="text-sm-fluid text-gray-600 dark:text-gray-400">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
                 No active loans. Add a loan to see EMI commitment.
               </p>
             </div>

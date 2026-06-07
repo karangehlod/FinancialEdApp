@@ -24,7 +24,6 @@ import logging
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import declarative_base
 from sqlalchemy import event
-from sqlalchemy.pool import NullPool
 
 from app.config import settings
 
@@ -39,42 +38,20 @@ _PGBOUNCER_MODE = settings.PGBOUNCER_MODE
 _ASYNCPG_CONNECT_ARGS: dict = {}
 if _PGBOUNCER_MODE:
     _ASYNCPG_CONNECT_ARGS = {"statement_cache_size": 0}
-    # In transaction-mode PgBouncer prepared statements and session-scoped
-    # resources can cause errors. We disable statement caching and use
-    # NullPool so SQLAlchemy does not retain connections across transactions.
-    logger.warning(
-        "PgBouncer transaction mode enabled: asyncpg prepared statements DISABLED; using NullPool for compatibility"
-    )
+    logger.info("PgBouncer transaction mode: asyncpg prepared statements DISABLED")
 
 # ---------------------------------------------------------------------------
 # Pool configuration — all values from settings (tunable via env vars)
 # ---------------------------------------------------------------------------
-if _PGBOUNCER_MODE:
-    # When using PgBouncer in transaction mode, NullPool is recommended to
-    # avoid session-affine behavior. Pool sizing is managed by PgBouncer.
-    _POOL_CONFIG = {
-        "echo": False,
-        "connect_args": _ASYNCPG_CONNECT_ARGS,
-        "poolclass": NullPool,
-    }
-else:
-    # Use SQLAlchemy's default QueuePool with tunable sizing from env vars
-    _POOL_CONFIG = {
-        "echo": False,
-        "pool_pre_ping": settings.DB_POOL_PRE_PING,
-        "pool_size": settings.DB_POOL_SIZE,
-        "max_overflow": settings.DB_MAX_OVERFLOW,
-        "pool_timeout": settings.DB_POOL_TIMEOUT,
-        "pool_recycle": settings.DB_POOL_RECYCLE,
-        "connect_args": _ASYNCPG_CONNECT_ARGS,
-    }
-
-logger.info(
-    "DB pool configuration: pgbouncer=%s pool_size=%s max_overflow=%s",
-    _PGBOUNCER_MODE,
-    settings.DB_POOL_SIZE,
-    settings.DB_MAX_OVERFLOW,
-)
+_POOL_CONFIG = {
+    "echo": False,
+    "pool_pre_ping": settings.DB_POOL_PRE_PING,
+    "pool_size": settings.DB_POOL_SIZE,
+    "max_overflow": settings.DB_MAX_OVERFLOW,
+    "pool_timeout": settings.DB_POOL_TIMEOUT,
+    "pool_recycle": settings.DB_POOL_RECYCLE,
+    "connect_args": _ASYNCPG_CONNECT_ARGS,
+}
 
 # ---------------------------------------------------------------------------
 # Auth Database Engine  (users, refresh_tokens)
@@ -196,49 +173,3 @@ async def dispose_engines() -> None:
     await auth_engine.dispose()
     await data_engine.dispose()
     logger.info("Database connection pools disposed.")
-
-def get_pool_strategy_summary() -> dict:
-    """Return a concise summary of the effective pool strategy for each engine.
-
-    Useful for logging at application startup and for unit tests.
-    """
-    def _summarize(engine, pool_name: str):
-        try:
-            pool = engine.sync_engine.pool
-            pool_class = pool.__class__.__name__
-            # Some pools (NullPool) don't expose sizing attributes
-            size = getattr(pool, 'size', None)
-            max_overflow = getattr(pool, 'overflow', None)
-        except Exception:
-            pool_class = 'unknown'
-            size = None
-            max_overflow = None
-        return {
-            'pool_name': pool_name,
-            'pool_class': pool_class,
-            'pool_size': size,
-            'max_overflow': max_overflow,
-            'pgbouncer_mode': _PGBOUNCER_MODE,
-        }
-
-    return {
-        'auth_db': _summarize(auth_engine, 'auth_db'),
-        'data_db': _summarize(data_engine, 'data_db'),
-    }
-
-
-def log_effective_pool_strategy():
-    """Log a concise human-readable summary of the DB pool strategy.
-
-    Intended to be called from application startup (FastAPI lifespan) so the
-    running configuration is visible in logs and can be asserted in smoke tests.
-    """
-    try:
-        summary = get_pool_strategy_summary()
-        logger.info(
-            "Effective DB pool strategy: auth_db=%s data_db=%s",
-            summary['auth_db'],
-            summary['data_db'],
-        )
-    except Exception as exc:  # pragma: no cover
-        logger.warning("Could not log pool strategy: %s", exc)

@@ -23,7 +23,7 @@ class TestGoalAuthentication:
     def test_create_goal_unauthorized(self, client):
         """Test goal creation without authentication."""
         response = client.post(
-            "/api/v1/goals",
+            "/api/v1/goals/",
             json={
                 "goal_name": "Emergency Fund",
                 "goal_type": "emergency_fund",
@@ -35,7 +35,7 @@ class TestGoalAuthentication:
     
     def test_get_goals_unauthorized(self, client):
         """Test retrieving goals without authentication."""
-        response = client.get("/api/v1/goals")
+        response = client.get("/api/v1/goals/")
         assert response.status_code == 401
     
     def test_get_single_goal_unauthorized(self, client):
@@ -89,7 +89,7 @@ class TestGoalInputValidation:
         """Test creating goal without required fields."""
         # Missing goal_name
         response = client.post(
-            "/api/v1/goals",
+            "/api/v1/goals/",
             json={
                 "goal_type": "savings",
                 "target_amount": 300000.0,
@@ -101,7 +101,7 @@ class TestGoalInputValidation:
         
         # Missing goal_type
         response = client.post(
-            "/api/v1/goals",
+            "/api/v1/goals/",
             json={
                 "goal_name": "Emergency Fund",
                 "target_amount": 300000.0,
@@ -113,7 +113,7 @@ class TestGoalInputValidation:
         
         # Missing target_amount
         response = client.post(
-            "/api/v1/goals",
+            "/api/v1/goals/",
             json={
                 "goal_name": "Emergency Fund",
                 "goal_type": "savings",
@@ -125,7 +125,7 @@ class TestGoalInputValidation:
         
         # Missing target_date
         response = client.post(
-            "/api/v1/goals",
+            "/api/v1/goals/",
             json={
                 "goal_name": "Emergency Fund",
                 "goal_type": "savings",
@@ -139,7 +139,7 @@ class TestGoalInputValidation:
         """Test creating goal with invalid data."""
         # Negative target amount
         response = client.post(
-            "/api/v1/goals",
+            "/api/v1/goals/",
             json={
                 "goal_name": "Emergency Fund",
                 "goal_type": "savings",
@@ -152,7 +152,7 @@ class TestGoalInputValidation:
         
         # Zero target amount  
         response = client.post(
-            "/api/v1/goals",
+            "/api/v1/goals/",
             json={
                 "goal_name": "Emergency Fund",
                 "goal_type": "savings",
@@ -166,7 +166,7 @@ class TestGoalInputValidation:
         # Past target date
         past_date = (date.today() - timedelta(days=1)).isoformat()
         response = client.post(
-            "/api/v1/goals",
+            "/api/v1/goals/",
             json={
                 "goal_name": "Emergency Fund",
                 "goal_type": "savings",
@@ -179,7 +179,7 @@ class TestGoalInputValidation:
         
         # Invalid goal_type
         response = client.post(
-            "/api/v1/goals",
+            "/api/v1/goals/",
             json={
                 "goal_name": "Emergency Fund",
                 "goal_type": "invalid_type",
@@ -192,7 +192,7 @@ class TestGoalInputValidation:
         
         # Invalid priority
         response = client.post(
-            "/api/v1/goals",
+            "/api/v1/goals/",
             json={
                 "goal_name": "Emergency Fund",
                 "goal_type": "savings",
@@ -295,7 +295,7 @@ class TestGoalJSONValidation:
         
         # Test POST with malformed JSON
         response = client.post(
-            "/api/v1/goals",
+            "/api/v1/goals/",
             data='{"invalid": json}',  # Malformed JSON
             headers={
                 "Authorization": "Bearer invalid_token",
@@ -331,7 +331,7 @@ class TestGoalJSONValidation:
         """Test endpoints with invalid JSON types."""
         # String instead of number for target_amount
         response = client.post(
-            "/api/v1/goals",
+            "/api/v1/goals/",
             json={
                 "goal_name": "Emergency Fund",
                 "goal_type": "savings",
@@ -344,7 +344,7 @@ class TestGoalJSONValidation:
         
         # Invalid date format
         response = client.post(
-            "/api/v1/goals",
+            "/api/v1/goals/",
             json={
                 "goal_name": "Emergency Fund", 
                 "goal_type": "savings",
@@ -367,7 +367,7 @@ class TestGoalBusinessLogic:
         # in mocking authentication properly. In a real test suite,
         # we would use dependency_overrides or a test database
         response = client.post(
-            "/api/v1/goals",
+            "/api/v1/goals/",
             json={
                 "goal_name": "Emergency Fund",
                 "goal_type": "emergency_fund",
@@ -411,7 +411,7 @@ class TestGoalBusinessLogic:
         
         for goal_data in test_cases:
             response = client.post(
-                "/api/v1/goals",
+                "/api/v1/goals/",
                 json=goal_data,
                 headers={"Authorization": "Bearer invalid_token"}
             )
@@ -424,7 +424,7 @@ class TestGoalBusinessLogic:
         
         for goal_type in valid_types:
             response = client.post(
-                "/api/v1/goals",
+                "/api/v1/goals/",
                 json={
                     "goal_name": f"Test {goal_type} Goal",
                     "goal_type": goal_type,
@@ -442,7 +442,7 @@ class TestGoalBusinessLogic:
         
         for priority in valid_priorities:
             response = client.post(
-                "/api/v1/goals",
+                "/api/v1/goals/",
                 json={
                     "goal_name": f"Test {priority} Priority Goal",
                     "goal_type": "savings",
@@ -478,12 +478,12 @@ class TestGoalHTTPMethods:
     def test_goals_endpoint_methods(self, client):
         """Test allowed HTTP methods on goals endpoint."""
         # GET should work (returns 401 for auth, not 405)
-        response = client.get("/api/v1/goals")
+        response = client.get("/api/v1/goals/")
         assert response.status_code != 405
         
         # POST should work (returns 401 for auth, not 405)
         response = client.post(
-            "/api/v1/goals",
+            "/api/v1/goals/",
             json={
                 "goal_name": "Test Goal",
                 "goal_type": "savings",
@@ -536,7 +536,7 @@ class TestGoalEndpointExistence:
     def test_main_goal_endpoints_exist(self, client):
         """Test that main goal endpoints exist."""
         # List goals
-        response = client.get("/api/v1/goals")
+        response = client.get("/api/v1/goals/")
         assert response.status_code != 404
         
         # Single goal

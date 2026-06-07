@@ -93,8 +93,7 @@ class BudgetRepository:
             select(Budget).where(
                 and_(
                     Budget.id == budget_id,
-                    Budget.user_id == user_id,
-                    Budget.is_deleted == False  # P1-7: Filter out soft-deleted
+                    Budget.user_id == user_id
                 )
             )
         )
@@ -122,8 +121,7 @@ class BudgetRepository:
                 and_(
                     Budget.user_id == user_id,
                     Budget.month == month,
-                    Budget.category == category,
-                    Budget.is_deleted == False  # P1-7: Filter out soft-deleted
+                    Budget.category == category
                 )
             )
         )
@@ -146,12 +144,7 @@ class BudgetRepository:
         Returns:
             List of Budget objects
         """
-        query = select(Budget).where(
-            and_(
-                Budget.user_id == user_id,
-                Budget.is_deleted == False  # P1-7: Filter out soft-deleted
-            )
-        )
+        query = select(Budget).where(Budget.user_id == user_id)
         
         if start_date and end_date:
             query = query.where(
@@ -205,7 +198,7 @@ class BudgetRepository:
     
     async def delete(self, budget_id: UUID, user_id: UUID) -> bool:
         """
-        Soft delete a budget.
+        Delete a budget.
         
         Args:
             budget_id: UUID of the budget to delete
@@ -221,9 +214,7 @@ class BudgetRepository:
         if not budget:
             raise ResourceNotFoundError("Budget", str(budget_id))
         
-        # P1-7: Soft delete - mark as deleted without removing from DB
-        budget.soft_delete()
-        self.db.add(budget)
-        await self.db.flush()  # ✅ Ensure soft delete is flushed before commit
+        await self.db.delete(budget)
+        await self.db.flush()  # ✅ Ensure delete is flushed before commit
         await self.db.commit()
         return True

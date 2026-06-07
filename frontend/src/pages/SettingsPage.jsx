@@ -279,8 +279,8 @@ export const SettingsPage = () => {
           <div className="flex items-center gap-3">
             <Settings className="w-8 h-8 text-primary-600" />
             <div>
-              <h1 className="text-heading-lg font-bold text-gray-900 dark:text-gray-100">Settings</h1>
-              <p className="text-sm-fluid text-gray-600 dark:text-gray-400 mt-1">Manage your account and preferences</p>
+              <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100">Settings</h1>
+              <p className="text-gray-600 dark:text-gray-400 mt-1">Manage your account and preferences</p>
             </div>
           </div>
         </motion.div>
@@ -332,11 +332,11 @@ export const SettingsPage = () => {
             {/* Profile Tab */}
             {activeTab === 'profile' && (
               <Card className="p-8">
-                <h2 className="text-2xl-fluid font-bold text-gray-900 dark:text-gray-100 mb-6">Profile Information</h2>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Profile Information</h2>
                 <form onSubmit={handleProfileUpdate} className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm-fluid font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         First Name
                       </label>
                       <Input
@@ -349,7 +349,7 @@ export const SettingsPage = () => {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm-fluid font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Last Name
                       </label>
                       <Input
@@ -364,7 +364,7 @@ export const SettingsPage = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm-fluid font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Email Address
                     </label>
                     <Input
@@ -374,7 +374,7 @@ export const SettingsPage = () => {
                       className="bg-gray-50 dark:bg-gray-700"
                       placeholder="john@example.com"
                     />
-                    <p className="text-xs-fluid text-gray-600 dark:text-gray-400 mt-2">
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
                       Email cannot be changed. Contact support if you need to update it.
                     </p>
                   </div>
@@ -397,10 +397,10 @@ export const SettingsPage = () => {
               <div className="space-y-6">
                 {/* Password Change Card */}
                 <Card className="p-8">
-                  <h2 className="text-2xl-fluid font-bold text-gray-900 dark:text-gray-100 mb-6">Change Password</h2>
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Change Password</h2>
                   <form onSubmit={handlePasswordChange} className="space-y-6">
                     <div>
-                      <label className="block text-sm-fluid font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Current Password
                       </label>
                       <Input
@@ -413,7 +413,7 @@ export const SettingsPage = () => {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm-fluid font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         New Password
                       </label>
                       <Input
@@ -424,10 +424,10 @@ export const SettingsPage = () => {
                         }
                         placeholder="Enter your new password"
                       />
-                      <p className="text-xs-fluid text-gray-600 dark:text-gray-400 mt-2">Must be at least 8 characters long</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">Must be at least 8 characters long</p>
                     </div>
                     <div>
-                      <label className="block text-sm-fluid font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Confirm Password
                       </label>
                       <Input
@@ -451,7 +451,7 @@ export const SettingsPage = () => {
                 <Card className="p-8">
                   <div className="flex items-center gap-3 mb-6">
                     <Shield className="w-6 h-6 text-indigo-600" />
-                    <h2 className="text-2xl-fluid font-bold text-gray-900 dark:text-gray-100">Two-Factor Authentication</h2>
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Two-Factor Authentication</h2>
                   </div>
 
                   {/* 2FA Status: Not enabled */}
@@ -494,7 +494,7 @@ export const SettingsPage = () => {
                         </code>
                       </div>
                       <div>
-                        <label className="block text-sm-fluid font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                           Verification Code
                         </label>
                         <input
@@ -594,7 +594,7 @@ export const SettingsPage = () => {
             {/* Income Tab */}
             {activeTab === 'income' && (
               <Card className="p-8">
-                <h2 className="text-2xl-fluid font-bold text-gray-900 dark:text-gray-100 mb-6">Financial Information</h2>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Financial Information</h2>
                 <IncomeManager
                   initialIncome={financialData.monthly_salary || financialProfile?.monthly_salary || 0}
                   currency={currency}
@@ -616,10 +616,10 @@ export const SettingsPage = () => {
             {/* Preferences Tab */}
             {activeTab === 'preferences' && (
               <Card className="p-8">
-                <h2 className="text-2xl-fluid font-bold text-gray-900 dark:text-gray-100 mb-6">Preferences</h2>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Preferences</h2>
                 <div className="space-y-6">
                   <div>
-                    <label className="block text-sm-fluid font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Currency
                     </label>
                     <select
@@ -708,7 +708,7 @@ export const SettingsPage = () => {
             {/* Legal Tab */}
             {activeTab === 'legal' && (
               <Card className="p-8">
-                <h2 className="text-2xl-fluid font-bold text-gray-900 dark:text-gray-100 mb-6">Legal</h2>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Legal</h2>
                 <div className="space-y-6">
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">Terms of Service</h3>

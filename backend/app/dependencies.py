@@ -8,7 +8,6 @@ every request — bcrypt with rounds=12 is intentionally expensive.
 """
 
 import logging
-import os
 import uuid
 from typing import Optional
 
@@ -16,8 +15,7 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security_compat import decode_token
-from jose import JWTError
+from app.core.security import decode_token
 from app.db.session import get_auth_db, get_data_db
 from app.db.models.auth import User
 from app.core.provider_implementations import RedisCache
@@ -29,33 +27,20 @@ logger = logging.getLogger(__name__)
 security = HTTPBearer(auto_error=False)
 
 # ---------------------------------------------------------------------------
-# Redis cache — sourced from app.state (no module-level mutable global)
+# Legacy global for backward compatibility (set during startup)
 # ---------------------------------------------------------------------------
-
-def get_redis_cache(request: Request) -> Optional[RedisCache]:
-    """
-    Return the Redis cache instance stored on app.state.
-
-    Resolves from ``app.state.cache`` which is set during lifespan startup.
-    Returns None when Redis is unavailable (startup falls back to NullCacheService).
-    """
-    return getattr(request.app.state, "cache", None)
+_redis_cache: Optional[RedisCache] = None
 
 
-# ---------------------------------------------------------------------------
-# Backward-compatibility shim (used by lifespan startup in main.py)
-# ---------------------------------------------------------------------------
+def get_redis_cache() -> Optional[RedisCache]:
+    """Return the global Redis cache instance (may be None if Redis is down)."""
+    return _redis_cache
+
 
 async def set_redis_cache(cache: Optional[RedisCache]) -> None:
-    """
-    No-op shim retained for backward compatibility with main.py startup.
-
-    The cache is now stored on ``app.state`` directly; this function is kept
-    so existing startup code does not need to change but no longer sets a
-    module-level global.
-    """
-    # Nothing to do — the startup code already writes to app.state.cache.
-    pass
+    """Store the Redis cache instance (called from lifespan startup)."""
+    global _redis_cache
+    _redis_cache = cache
 
 
 # ---------------------------------------------------------------------------
@@ -70,20 +55,9 @@ def get_password_hasher(request: Request):
     """
     hasher = getattr(request.app.state, "password_hasher", None)
     if hasher is None:
-        # If the app lifespan did not run (e.g. during unit tests) we allow
-        # a lightweight fallback. In production this indicates a misconfiguration
-        # so surface an explicit error to avoid creating expensive objects per-request.
-        is_testing = bool(
-            request.app.state.__dict__.get("TESTING")
-            or request.app.state.__dict__.get("PYTEST_CURRENT_TEST")
-            or os.environ.get("TESTING")
-            or os.environ.get("PYTEST_CURRENT_TEST")
-        )
-        if not is_testing:
-            raise RuntimeError("Password hasher singleton not initialised. Ensure application lifespan startup runs.")
+        # Fallback during tests (lifespan may not run)
         from app.core.provider_implementations import BcryptPasswordHasher
-        # Use reduced rounds in test fallback for speed
-        return BcryptPasswordHasher(rounds=4)
+        return BcryptPasswordHasher(rounds=12)
     return hasher
 
 
@@ -95,17 +69,6 @@ def get_token_provider(request: Request):
     """
     provider = getattr(request.app.state, "token_provider", None)
     if provider is None:
-        # See comment in get_password_hasher — do not silently create a full
-        # token provider in production. Use a lightweight test provider when
-        # running under tests.
-        is_testing = bool(
-            request.app.state.__dict__.get("TESTING")
-            or request.app.state.__dict__.get("PYTEST_CURRENT_TEST")
-            or os.environ.get("TESTING")
-            or os.environ.get("PYTEST_CURRENT_TEST")
-        )
-        if not is_testing:
-            raise RuntimeError("Token provider singleton not initialised. Ensure application lifespan startup runs.")
         from app.core.provider_implementations import JWTTokenProvider
         from app.config import settings
         return JWTTokenProvider(
@@ -123,18 +86,6 @@ def get_cache_service(request: Request) -> CacheService:
 
     Falls back to NullCacheService if Redis is unavailable.
     """
-    # Prefer the unified `app.state.cache` attribute (set during lifespan startup).
-    cache = getattr(request.app.state, "cache", None)
-    if cache is not None:
-        # If a raw provider (RedisCache) was stored we wrap it with CacheService
-        # to expose the higher-level API expected by callers.
-        if isinstance(cache, CacheService):
-            return cache
-        try:
-            return CacheService(cache)
-        except Exception:
-            # Fallback to explicit cache_service attribute for backward compat
-            pass
     return getattr(request.app.state, "cache_service", None) or NullCacheService()
 
 
@@ -166,14 +117,7 @@ async def get_current_user(
         )
 
     token = credentials.credentials
-    try:
-        payload = decode_token(token)
-    except (JWTError, Exception):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    payload = decode_token(token)
 
     user_id_str: Optional[str] = payload.get("sub")
     if not user_id_str:

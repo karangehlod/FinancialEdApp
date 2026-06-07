@@ -1,12 +1,4 @@
-"""
-Additional tests for LoanService (facade) to maintain/improve coverage.
-
-After the BE-05 refactor the facade no longer has .db, ._repo, or
-._loan_to_response — all that logic lives in the sub-services.
-These tests verify the facade's public API, attribute guarantees, and
-delegation behaviour.
-"""
-
+"""Additional tests for loan service to improve coverage."""
 import pytest
 from decimal import Decimal
 from datetime import date, datetime
@@ -15,42 +7,21 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.services.loan_service import LoanService
 from app.schemas.loan import LoanCreate, LoanUpdate
+from app.db.models.data import Loan
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Shared helpers
-# ──────────────────────────────────────────────────────────────────────────────
-
-def _make_service(financial_service=None):
-    """Build a LoanService wired to a mock repo (no real DB calls)."""
-    mock_db = AsyncMock()
-    mock_repo = AsyncMock()
-    return LoanService(
-        db=mock_db,
-        financial_profile_service=financial_service,
-        loan_repository=mock_repo,
-    )
-
-
-def _stub(facade: LoanService, sub: str, method: str, return_value=None):
-    m = AsyncMock(return_value=return_value)
-    setattr(getattr(facade, sub), method, m)
-    return m
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# TestLoanServiceEdgeCases — delegation with sub-service stubs
-# ──────────────────────────────────────────────────────────────────────────────
 
 class TestLoanServiceEdgeCases:
-    """Edge cases delegated to crud sub-service."""
+    """Test edge cases and error conditions in loan service."""
 
     @pytest.fixture
     def loan_service(self):
-        return _make_service()
+        """Create loan service with mocked database."""
+        mock_db = AsyncMock()
+        return LoanService(mock_db)
 
     @pytest.fixture
     def sample_loan_create(self):
+        """Sample loan creation data."""
         return LoanCreate(
             loan_type="Home",
             lender_name="Test Bank",
@@ -58,194 +29,322 @@ class TestLoanServiceEdgeCases:
             interest_rate=Decimal("8.5"),
             loan_term_months=240,
             start_date=date.today(),
+            emi_amount=None  # Will be calculated
         )
 
     @pytest.mark.asyncio
     async def test_create_loan_with_calculated_emi(self, loan_service, sample_loan_create):
-        """Facade delegates create_loan; EMI calculation is sub-service concern."""
+        """Test loan creation with EMI calculation."""
         user_id = uuid4()
+        # Ensure EMI is not provided so it gets calculated
         sample_loan_create.emi_amount = None
-        expected = MagicMock()
-        m = _stub(loan_service, "_crud", "create_loan", return_value=expected)
-        result = await loan_service.create_loan(user_id, sample_loan_create)
-        m.assert_awaited_once_with(user_id, sample_loan_create)
-        assert result is expected
+        
+        with patch('app.services.loan_calculators.EMICalculator.calculate_emi') as mock_emi_calc, \
+             patch('app.services.loan_domain.DueDate.calculate_next_due_date') as mock_due_date, \
+             patch.object(loan_service, '_loan_to_response') as mock_response:
+            
+            mock_emi_calc.return_value = Decimal("4500.00")
+            mock_due_date.return_value = date.today()
+            
+            # Mock the response
+            mock_loan_response = MagicMock()
+            mock_response.return_value = mock_loan_response
+            
+            # Mock database operations
+            loan_service.db.add = MagicMock()
+            loan_service.db.commit = AsyncMock()
+            loan_service.db.refresh = AsyncMock()
+            
+            # Mock financial profile service
+            loan_service.financial_profile_service.update_from_loans = AsyncMock()
+            
+            result = await loan_service.create_loan(user_id, sample_loan_create)
+            
+            # Verify EMI was calculated
+            mock_emi_calc.assert_called_once()
+            mock_due_date.assert_called_once()
+            assert result == mock_loan_response
 
     @pytest.mark.asyncio
     async def test_create_loan_with_provided_emi(self, loan_service, sample_loan_create):
-        """Facade delegates regardless of whether EMI is provided."""
+        """Test loan creation with provided EMI amount."""
         user_id = uuid4()
         sample_loan_create.emi_amount = Decimal("5000.00")
-        expected = MagicMock()
-        m = _stub(loan_service, "_crud", "create_loan", return_value=expected)
-        result = await loan_service.create_loan(user_id, sample_loan_create)
-        m.assert_awaited_once_with(user_id, sample_loan_create)
-        assert result is expected
+        
+        with patch('app.services.loan_calculators.EMICalculator.calculate_emi') as mock_emi_calc, \
+             patch('app.services.loan_domain.DueDate.calculate_next_due_date') as mock_due_date, \
+             patch.object(loan_service, '_loan_to_response') as mock_response:
+            
+            mock_due_date.return_value = date.today()
+            
+            # Mock the response
+            mock_loan_response = MagicMock()
+            mock_response.return_value = mock_loan_response
+            
+            # Mock database operations
+            loan_service.db.add = MagicMock()
+            loan_service.db.commit = AsyncMock()
+            loan_service.db.refresh = AsyncMock()
+            
+            # Mock financial profile service
+            loan_service.financial_profile_service.update_from_loans = AsyncMock()
+            
+            result = await loan_service.create_loan(user_id, sample_loan_create)
+            
+            # Verify EMI was not calculated since it was provided
+            mock_emi_calc.assert_not_called()
+            assert result == mock_loan_response
 
     @pytest.mark.asyncio
     async def test_financial_profile_service_lazy_import(self, loan_service):
-        """financial_profile_service attribute is set at init time."""
-        assert loan_service._crud is not None
-        # sub-services hold a reference to the financial profile service
-        assert hasattr(loan_service._crud, "financial_profile_service") or True  # best-effort
+        """Test that financial profile service is lazily imported."""
+        # Verify the service was set during initialization
+        assert loan_service.financial_profile_service is not None
 
     @pytest.mark.asyncio
     async def test_database_error_handling(self, loan_service, sample_loan_create):
-        """Sub-service propagates DB errors; facade re-raises them."""
+        """Test handling of database errors during loan creation."""
         user_id = uuid4()
-        _stub(loan_service, "_crud", "create_loan",
-              return_value=AsyncMock(side_effect=Exception("Database error")))
-        # re-configure as actual raising mock
-        loan_service._crud.create_loan = AsyncMock(side_effect=Exception("Database error"))
-        with pytest.raises(Exception, match="Database error"):
-            await loan_service.create_loan(user_id, sample_loan_create)
+        
+        with patch('app.services.loan_calculators.EMICalculator.calculate_emi') as mock_emi_calc, \
+             patch('app.services.loan_domain.DueDate.calculate_next_due_date') as mock_due_date:
+            
+            mock_emi_calc.return_value = Decimal("4500.00")
+            mock_due_date.return_value = date.today()
+            
+            # Mock database error
+            loan_service.db.commit = AsyncMock(side_effect=Exception("Database error"))
+            
+            with pytest.raises(Exception):
+                await loan_service.create_loan(user_id, sample_loan_create)
 
     @pytest.mark.asyncio
     async def test_initialization_with_custom_financial_service(self):
-        """Custom financial service is forwarded to sub-services."""
-        mock_financial = MagicMock()
-        svc = _make_service(financial_service=mock_financial)
-        # The crud sub-service should hold our mock
-        assert svc._crud.financial_profile_service is mock_financial
+        """Test loan service initialization with custom financial service."""
+        mock_db = AsyncMock()
+        mock_financial_service = MagicMock()
+        
+        loan_service = LoanService(mock_db, mock_financial_service)
+        
+        assert loan_service.financial_profile_service == mock_financial_service
 
     @pytest.mark.asyncio
     async def test_create_loan_enum_handling(self, loan_service):
-        """Enum-typed loan_type is handled by the crud sub-service."""
+        """Test loan creation with enum handling."""
         user_id = uuid4()
+        
+        # Create loan data with enum value
         from app.schemas.loan import LoanType
         loan_create = LoanCreate(
-            loan_type=LoanType.PERSONAL,
+            loan_type=LoanType.PERSONAL,  # Use enum instead of string
             lender_name="Test Bank",
             principal_amount=Decimal("100000"),
             interest_rate=Decimal("12.0"),
             loan_term_months=60,
-            start_date=date.today(),
+            start_date=date.today()
         )
-        expected = MagicMock()
-        m = _stub(loan_service, "_crud", "create_loan", return_value=expected)
-        result = await loan_service.create_loan(user_id, loan_create)
-        m.assert_awaited_once_with(user_id, loan_create)
-        assert result is expected
+        
+        with patch('app.services.loan_calculators.EMICalculator.calculate_emi') as mock_emi_calc, \
+             patch('app.services.loan_domain.DueDate.calculate_next_due_date') as mock_due_date, \
+             patch.object(loan_service, '_loan_to_response') as mock_response:
+            
+            mock_emi_calc.return_value = Decimal("2000.00")
+            mock_due_date.return_value = date.today()
+            
+            # Mock the response
+            mock_loan_response = MagicMock()
+            mock_response.return_value = mock_loan_response
+            
+            # Mock database operations
+            loan_service.db.add = MagicMock()
+            loan_service.db.commit = AsyncMock()
+            loan_service.db.refresh = AsyncMock()
+            
+            # Mock financial profile service
+            loan_service.financial_profile_service.update_from_loans = AsyncMock()
+            
+            result = await loan_service.create_loan(user_id, loan_create)
+            
+            # Verify the loan type was properly converted from enum to string
+            call_args = loan_service.db.add.call_args[0][0]
+            assert call_args.loan_type == "Personal"
+            assert result == mock_loan_response
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# TestLoanServiceComplexOperations
-# ──────────────────────────────────────────────────────────────────────────────
 
 class TestLoanServiceComplexOperations:
-    """Complex operation delegation."""
+    """Test complex operations that might have low coverage."""
 
     @pytest.fixture
     def loan_service(self):
-        return _make_service()
+        mock_db = AsyncMock()
+        return LoanService(mock_db)
 
     @pytest.mark.asyncio
     async def test_invalid_decimal_handling(self, loan_service):
-        """Small-value loans are delegated without modification."""
+        """Test handling of valid but small decimal values."""
         user_id = uuid4()
+        
+        # Create loan with small but valid decimal values
         loan_create = LoanCreate(
             loan_type="Personal",
             lender_name="Test Bank",
-            principal_amount=Decimal("100.00"),
-            interest_rate=Decimal("0.01"),
+            principal_amount=Decimal("100.00"),  # Valid amount
+            interest_rate=Decimal("0.01"),       # Valid rate (0.01% = 2 decimal places)
             loan_term_months=12,
-            start_date=date.today(),
+            start_date=date.today()
         )
-        expected = MagicMock()
-        m = _stub(loan_service, "_crud", "create_loan", return_value=expected)
-        result = await loan_service.create_loan(user_id, loan_create)
-        m.assert_awaited_once_with(user_id, loan_create)
-        assert result is expected
+        
+        with patch('app.services.loan_calculators.EMICalculator.calculate_emi') as mock_emi_calc:
+            # Mock EMI calculation
+            mock_emi_calc.return_value = Decimal("8.50")
+            
+            with patch('app.services.loan_domain.DueDate.calculate_next_due_date') as mock_due_date:
+                mock_due_date.return_value = date.today()
+                
+                loan_service.db.add = MagicMock()
+                loan_service.db.commit = AsyncMock()
+                loan_service.db.refresh = AsyncMock()
+                loan_service.financial_profile_service.update_from_loans = AsyncMock()
+                
+                with patch.object(loan_service, '_loan_to_response') as mock_response:
+                    mock_response.return_value = MagicMock()
+                    
+                    # Should handle small decimal values without error
+                    result = await loan_service.create_loan(user_id, loan_create)
+                    
+                    # Verify the operation completed
+                    loan_service.db.add.assert_called_once()
+                    loan_service.db.commit.assert_called_once()
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio  
     async def test_date_edge_cases(self, loan_service):
-        """Future start dates are passed through unchanged."""
+        """Test handling of edge case dates."""
         user_id = uuid4()
+        
+        # Test with start date far in the future
         future_date = date(2030, 12, 31)
         loan_create = LoanCreate(
             loan_type="Personal",
-            lender_name="Test Bank",
+            lender_name="Test Bank", 
             principal_amount=Decimal("100000"),
             interest_rate=Decimal("10.0"),
             loan_term_months=12,
-            start_date=future_date,
+            start_date=future_date
         )
-        expected = MagicMock()
-        m = _stub(loan_service, "_crud", "create_loan", return_value=expected)
-        result = await loan_service.create_loan(user_id, loan_create)
-        # verify the exact loan_create (with future_date) was forwarded
-        m.assert_awaited_once_with(user_id, loan_create)
-        assert result is expected
+        
+        with patch('app.services.loan_calculators.EMICalculator.calculate_emi') as mock_emi_calc, \
+             patch('app.services.loan_domain.DueDate.calculate_next_due_date') as mock_due_date, \
+             patch.object(loan_service, '_loan_to_response') as mock_response:
+            
+            mock_emi_calc.return_value = Decimal("9000.00")
+            mock_due_date.return_value = future_date
+            mock_response.return_value = MagicMock()
+            
+            loan_service.db.add = MagicMock()
+            loan_service.db.commit = AsyncMock()  
+            loan_service.db.refresh = AsyncMock()
+            loan_service.financial_profile_service.update_from_loans = AsyncMock()
+            
+            result = await loan_service.create_loan(user_id, loan_create)
+            
+            # Verify future date was handled correctly
+            mock_due_date.assert_called_once_with(future_date)
 
     @pytest.mark.asyncio
     async def test_large_number_handling(self, loan_service):
-        """Very large amounts are delegated without truncation."""
+        """Test handling of very large loan amounts."""
         user_id = uuid4()
+        
+        # Test with very large principal amount
         loan_create = LoanCreate(
             loan_type="Business",
             lender_name="Commercial Bank",
-            principal_amount=Decimal("100000000.00"),
+            principal_amount=Decimal("100000000.00"),  # 100 million
             interest_rate=Decimal("15.0"),
-            loan_term_months=360,
-            start_date=date.today(),
+            loan_term_months=360,  # 30 years
+            start_date=date.today()
         )
-        expected = MagicMock()
-        m = _stub(loan_service, "_crud", "create_loan", return_value=expected)
-        result = await loan_service.create_loan(user_id, loan_create)
-        m.assert_awaited_once_with(user_id, loan_create)
-        assert result is expected
+        
+        with patch('app.services.loan_calculators.EMICalculator.calculate_emi') as mock_emi_calc, \
+             patch('app.services.loan_domain.DueDate.calculate_next_due_date') as mock_due_date, \
+             patch.object(loan_service, '_loan_to_response') as mock_response:
+            
+            mock_emi_calc.return_value = Decimal("1234567.89")
+            mock_due_date.return_value = date.today()
+            mock_response.return_value = MagicMock()
+            
+            loan_service.db.add = MagicMock()
+            loan_service.db.commit = AsyncMock()
+            loan_service.db.refresh = AsyncMock()
+            loan_service.financial_profile_service.update_from_loans = AsyncMock()
+            
+            result = await loan_service.create_loan(user_id, loan_create)
+            
+            # Verify large numbers were handled without precision loss
+            loan_service.db.add.assert_called_once()
+            added_loan = loan_service.db.add.call_args[0][0]
+            assert added_loan.principal_amount == Decimal("100000000.00")
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# TestLoanServiceLazyLoading
-# ──────────────────────────────────────────────────────────────────────────────
 
 class TestLoanServiceLazyLoading:
-    """Dependency injection / lazy-loading guarantees."""
+    """Test lazy loading and dependency injection patterns."""
 
     def test_default_financial_profile_service_creation(self):
-        """When no financial service is provided, sub-services create their own."""
-        svc = _make_service(financial_service=None)
-        # sub-services must be created
-        assert svc._crud is not None
-        assert svc._payments is not None
-        assert svc._analytics is not None
+        """Test that financial profile service is created when not provided."""
+        mock_db = AsyncMock()
+        
+        with patch('app.services.budget_service.FinancialProfileService') as mock_service_class:
+            mock_service_instance = MagicMock()
+            mock_service_class.return_value = mock_service_instance
+            
+            loan_service = LoanService(mock_db)
+            
+            # Verify the service was instantiated with the database
+            mock_service_class.assert_called_once_with(mock_db)
+            assert loan_service.financial_profile_service == mock_service_instance
 
     def test_custom_financial_profile_service_used(self):
-        """When a financial service is provided it is forwarded to sub-services."""
-        custom = MagicMock()
-        svc = _make_service(financial_service=custom)
-        assert svc._crud.financial_profile_service is custom
-        assert svc._analytics.financial_profile_service is custom
+        """Test that custom financial profile service is used when provided."""
+        mock_db = AsyncMock()
+        custom_service = MagicMock()
+        
+        loan_service = LoanService(mock_db, custom_service)
+        
+        assert loan_service.financial_profile_service == custom_service
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# TestLoanServiceInitialization
-# ──────────────────────────────────────────────────────────────────────────────
 
 class TestLoanServiceInitialization:
-    """Constructor guarantees."""
+    """Test loan service initialization scenarios."""
 
     def test_initialization_with_minimal_parameters(self):
-        """Only db is required; all sub-services are created."""
-        svc = _make_service()
-        assert svc.crud is svc._crud
-        assert svc.payments is svc._payments
-        assert svc.analytics is svc._analytics
+        """Test initialization with only required parameters."""
+        mock_db = AsyncMock()
+        
+        loan_service = LoanService(mock_db)
+        
+        assert loan_service.db == mock_db
+        assert loan_service.financial_profile_service is not None
 
     def test_initialization_with_all_parameters(self):
-        """All parameters forwarded correctly."""
-        mock_financial = MagicMock()
-        svc = _make_service(financial_service=mock_financial)
-        assert svc._crud.financial_profile_service is mock_financial
+        """Test initialization with all parameters."""
+        mock_db = AsyncMock()
+        mock_financial_service = MagicMock()
+        
+        loan_service = LoanService(mock_db, mock_financial_service)
+        
+        assert loan_service.db == mock_db
+        assert loan_service.financial_profile_service == mock_financial_service
 
     @pytest.mark.asyncio
     async def test_service_dependencies_are_available(self):
-        """All public surface is accessible."""
-        svc = _make_service()
-        assert hasattr(svc, "crud")
-        assert hasattr(svc, "payments")
-        assert hasattr(svc, "analytics")
-        assert svc.crud is not None
-        assert svc.payments is not None
-        assert svc.analytics is not None
+        """Test that all required dependencies are properly available."""
+        mock_db = AsyncMock()
+        loan_service = LoanService(mock_db)
+        
+        # Verify all required attributes are present
+        assert hasattr(loan_service, 'db')
+        assert hasattr(loan_service, 'financial_profile_service')
+        
+        # Verify they are not None
+        assert loan_service.db is not None
+        assert loan_service.financial_profile_service is not None

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react'
-import { Card, Button, Input, Select, FluidIcon } from '../UI'
+import { Card, Button, Input, Select } from '../UI'
 import { motion } from 'framer-motion'
 import { Target, TrendingUp, Zap, Calendar } from 'lucide-react'
 import { formatCurrency, formatDate } from '../../utils/helpers'
@@ -202,23 +202,23 @@ export const GoalAllocationStrategy = ({ goals = [], monthlyAvailable = 0, onClo
       {/* Overview Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30">
-          <p className="text-xs-fluid text-gray-600 dark:text-gray-400 mb-1">Total Goals</p>
-          <p className="text-stat font-bold text-blue-600 dark:text-blue-400">{goals.length}</p>
+          <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Total Goals</p>
+          <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{goals.length}</p>
         </Card>
 
         <Card className="p-4 bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/30 dark:to-green-800/30">
-          <p className="text-xs-fluid text-gray-600 dark:text-gray-400 mb-1">Overall Progress</p>
-          <p className="text-stat font-bold text-green-600 dark:text-green-400">{stats.progress.toFixed(1)}%</p>
+          <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Overall Progress</p>
+          <p className="text-3xl font-bold text-green-600 dark:text-green-400">{stats.progress.toFixed(1)}%</p>
         </Card>
 
         <Card className="p-4 bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/30 dark:to-orange-800/30">
-          <p className="text-xs-fluid text-gray-600 dark:text-gray-400 mb-1">Total Remaining</p>
-          <p className="text-value font-bold text-orange-600 dark:text-orange-400">{formatCurrency(stats.remaining)}</p>
+          <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Total Remaining</p>
+          <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{formatCurrency(stats.remaining)}</p>
         </Card>
 
         <Card className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/30">
-          <p className="text-xs-fluid text-gray-600 dark:text-gray-400 mb-1">Monthly Available</p>
-          <p className="text-value font-bold text-purple-600 dark:text-purple-400">{formatCurrency(availableFunds)}</p>
+          <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Monthly Available</p>
+          <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{formatCurrency(availableFunds)}</p>
         </Card>
       </div>
 
@@ -236,7 +236,7 @@ export const GoalAllocationStrategy = ({ goals = [], monthlyAvailable = 0, onClo
             { value: 'proportional', label: '📊 Gap-Based (By Remaining Amount)' },
           ]}
         />
-        <p className="text-sm-fluid text-gray-600 dark:text-gray-400 mt-3">
+        <p className="text-sm text-gray-600 dark:text-gray-400 mt-3">
           {strategyInfo[selectedStrategy]?.icon} {strategyInfo[selectedStrategy]?.description}
         </p>
       </Card>
@@ -280,8 +280,8 @@ export const GoalAllocationStrategy = ({ goals = [], monthlyAvailable = 0, onClo
                   {/* Goal Header */}
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
-                      <h4 className="text-lg-fluid font-semibold text-gray-900 dark:text-gray-100">{goal.goal_name}</h4>
-                      <p className="text-sm-fluid text-gray-600 dark:text-gray-400 mt-1">
+                      <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{goal.goal_name}</h4>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                         Target: {formatCurrency(goal.target_amount)} | Current: {formatCurrency(goal.current_amount)}
                       </p>
                     </div>
@@ -311,27 +311,27 @@ export const GoalAllocationStrategy = ({ goals = [], monthlyAvailable = 0, onClo
                   </div>
 
                   {/* Allocation Details Grid */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm-fluid mb-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm mb-4">
                     <div className="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg">
-                      <p className="text-gray-600 dark:text-gray-400 text-xs-fluid">Monthly Allocation</p>
+                      <p className="text-gray-600 dark:text-gray-400 text-xs">Monthly Allocation</p>
                       <p className="font-bold text-blue-600 dark:text-blue-400">{formatCurrency(monthlyAllocation)}</p>
                     </div>
 
                     <div className="bg-green-50 dark:bg-green-900/30 p-3 rounded-lg">
-                      <p className="text-gray-600 dark:text-gray-400 text-xs-fluid">Allocation %</p>
+                      <p className="text-gray-600 dark:text-gray-400 text-xs">Allocation %</p>
                       <p className="font-bold text-green-600 dark:text-green-400">
                         {availableFunds > 0 ? ((monthlyAllocation / availableFunds) * 100).toFixed(1) : 0}%
                       </p>
                     </div>
 
                     <div className="bg-orange-50 dark:bg-orange-900/30 p-3 rounded-lg">
-                      <p className="text-gray-600 dark:text-gray-400 text-xs-fluid">Months Remaining</p>
+                      <p className="text-gray-600 dark:text-gray-400 text-xs">Months Remaining</p>
                       <p className="font-bold text-orange-600 dark:text-orange-400">{monthsRemaining}</p>
                     </div>
 
                     <div className="bg-purple-50 dark:bg-purple-900/30 p-3 rounded-lg">
-                      <p className="text-gray-600 dark:text-gray-400 text-xs-fluid">Target Date</p>
-                      <p className="font-bold text-purple-600 dark:text-purple-400 text-xs-fluid">{formatDate(goal.target_date)}</p>
+                      <p className="text-gray-600 dark:text-gray-400 text-xs">Target Date</p>
+                      <p className="font-bold text-purple-600 dark:text-purple-400 text-xs">{formatDate(goal.target_date)}</p>
                     </div>
                   </div>
 
@@ -340,7 +340,7 @@ export const GoalAllocationStrategy = ({ goals = [], monthlyAvailable = 0, onClo
                     <motion.div
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
-                      className={`p-3 rounded-lg text-sm-fluid ${
+                      className={`p-3 rounded-lg text-sm ${
                         monthlyAllocation > 0 && monthsNeeded <= monthsRemaining
                           ? 'bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400'
                           : monthlyAllocation > 0
@@ -372,10 +372,10 @@ export const GoalAllocationStrategy = ({ goals = [], monthlyAvailable = 0, onClo
         </div>
       ) : (
         <Card className="p-8 text-center bg-gray-50 dark:bg-gray-700">
-          <FluidIcon icon={Target} size="lg" className="mx-auto text-gray-400 mb-3" />
-           <p className="text-gray-600 dark:text-gray-400">No goals yet. Create goals to see allocation strategy.</p>
-         </Card>
-       )}
+          <Target size={32} className="mx-auto text-gray-400 mb-3" />
+          <p className="text-gray-600 dark:text-gray-400">No goals yet. Create goals to see allocation strategy.</p>
+        </Card>
+      )}
 
       {/* Projection Section */}
       {goals.length > 0 && (

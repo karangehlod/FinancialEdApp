@@ -37,21 +37,20 @@ logger = logging.getLogger(__name__)
 SYSTEM_PROMPT = """You are FinEd AI — a friendly, knowledgeable personal financial advisor.
 
 Your capabilities:
-• Analyse the user's expenses, budgets, goals, loans, and financial profile — but you do NOT automatically have those values in the prompt.
-• Provide actionable, personalised advice when the necessary personal data is available.
+• Analyse the user's expenses, budgets, goals, loans, and financial profile.
+• Provide actionable, personalised advice based on their REAL data.
 • Explain financial concepts (compound interest, EMI, 50/30/20 rule, etc.).
 • Suggest concrete steps to save more, reduce debt, or reach goals faster.
 
-Operational rules (important):
-1. Never assume you already have the user's personal financial values in the conversation. If you need specific personal data (balances, incomes, expenses, budgets, loans, transactions, goals) to answer, call the appropriate tool(s) to fetch it first.
-2. Only call tools when the user's question requires factual personal data to produce a correct answer. Do NOT call tools by default for every request — prefer asking a clarifying question if the user's intent is ambiguous.
-3. When calling tools, request the minimal data necessary (e.g., "last 3 months expense by category", "current monthly salary and fixed expenses") to reduce data exposure and token usage.
-4. If data required is sensitive or the user hasn't explicitly requested a personalised response, ask the user for permission (consent) before retrieving or using personal data. Example: "Would you like me to use your personal financial data to give a tailored recommendation? Reply 'yes' to proceed.".
-5. Always ground your advice in the data returned by the tools. If a tool cannot find the requested data, state this explicitly and avoid fabricating numbers.
-6. Format numeric currency values with $ and commas (e.g., $1,234.56) and prefer short summaries with optional bullet details.
-7. Be concise, constructive, and actionable — use bullet points and numbered steps when appropriate.
-8. Respect the user's privacy — never expose raw internal identifiers or user IDs, and never log raw personal data in responses.
-9. If asked something outside personal finance (e.g., politics, medical advice, software bugs), politely decline and, if possible, redirect to a relevant resource.
+Rules:
+1. Always ground your advice in the user's actual data — call the available tools to fetch it.
+2. If you need information you don't have, use the appropriate tool before answering.
+3. Be concise but thorough — use bullet points and numbers.
+4. Never make up numbers. If data is unavailable, say so.
+5. Be encouraging and constructive — this is an educational app.
+6. Format currency values with $ and commas (e.g., $1,234.56).
+7. If asked something outside personal finance (e.g., politics, code), politely decline.
+8. Respect the user's privacy — never reveal raw user IDs or internal details.
 """
 
 
@@ -62,7 +61,6 @@ class AgentState(TypedDict):
     """State passed between graph nodes."""
     messages: Annotated[Sequence[BaseMessage], add_messages]
     user_id: str
-    consent_confirmed: bool
 
 
 # ---------------------------------------------------------------------------
@@ -98,7 +96,6 @@ def build_agent_graph(llm):
         """Execute tool calls requested by the LLM."""
         last_message = state["messages"][-1]
         user_id = state["user_id"]
-        consent_confirmed = state.get("consent_confirmed", False)
         tool_map = {t.name: t for t in ALL_TOOLS}
         results: list[ToolMessage] = []
 
@@ -108,19 +105,6 @@ def build_agent_graph(llm):
 
             # Inject user_id into every tool call transparently
             tool_args["user_id"] = user_id
-
-            # If consent not confirmed, do not execute tools that fetch personal data.
-            # Instead return a ToolMessage indicating consent is required; the agent
-            # should then ask the user for permission.
-            if not consent_confirmed:
-                results.append(
-                    ToolMessage(
-                        content=("Consent required: The user must explicitly allow access to personal financial data "
-                                 "before I can fetch it. Ask the user: 'Would you like me to use your personal financial data to give a tailored recommendation? Reply \'yes\' to proceed.'"),
-                        tool_call_id=tool_call.get("id"),
-                    )
-                )
-                continue
 
             fn = tool_map.get(tool_name)
             if fn is None:

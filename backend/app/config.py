@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     # CORS
     # =========================================================================
     # Comma-separated list e.g. "http://localhost:3000,https://app.example.com"
-    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:5173"
+    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
 
     # =========================================================================
     # JWT / Security

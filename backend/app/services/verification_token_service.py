@@ -12,12 +12,12 @@ SOLID:
   - Dependency Inversion: depends on CacheProvider + EmailService interfaces.
 """
 
+import hashlib
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID
 
-from app.config import settings
 from app.core.providers import CacheProvider, TokenProvider
 from app.core.exceptions import AuthenticationError
 
@@ -188,8 +188,5 @@ class VerificationTokenService:
 
 
 def _sha256(value: str) -> str:
-    """Return HMAC-SHA256 hex digest of a UTF-8 string using application secret."""
-    import hmac
-    import hashlib as _hashlib
-    key = settings.SECRET_KEY.encode('utf-8')
-    return hmac.new(key, value.encode('utf-8'), _hashlib.sha256).hexdigest()
+    """Return the hex-encoded SHA-256 digest of a UTF-8 string."""
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()

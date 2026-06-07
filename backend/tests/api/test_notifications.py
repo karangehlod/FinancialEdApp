@@ -22,7 +22,7 @@ class TestGetNotifications:
     def test_get_all_notifications(self, client):
         """Test retrieving all notifications."""
         response = client.get(
-            "/api/v1/notifications",
+            "/api/v1/notifications/",
             headers={"Authorization": "Bearer invalid_token"}
         )
         assert response.status_code in [200, 401, 403]
@@ -30,7 +30,7 @@ class TestGetNotifications:
     def test_get_notifications_with_status_filter(self, client):
         """Test retrieving notifications filtered by status."""
         response = client.get(
-            "/api/v1/notifications?status=unread",
+            "/api/v1/notifications/?status=unread",
             headers={"Authorization": "Bearer invalid_token"}
         )
         assert response.status_code in [200, 401, 403]
@@ -38,7 +38,7 @@ class TestGetNotifications:
     def test_get_notifications_with_type_filter(self, client):
         """Test retrieving notifications filtered by type."""
         response = client.get(
-            "/api/v1/notifications?type=budget_alert",
+            "/api/v1/notifications/?type=budget_alert",
             headers={"Authorization": "Bearer invalid_token"}
         )
         assert response.status_code in [200, 401, 403]
@@ -46,7 +46,7 @@ class TestGetNotifications:
     def test_get_notifications_pagination(self, client):
         """Test notification pagination."""
         response = client.get(
-            "/api/v1/notifications?skip=0&limit=10",
+            "/api/v1/notifications/?skip=0&limit=10",
             headers={"Authorization": "Bearer invalid_token"}
         )
         assert response.status_code in [200, 401, 403]
@@ -240,7 +240,7 @@ class TestNotificationEdgeCases:
     def test_get_notifications_with_invalid_status(self, client):
         """Test getting notifications with invalid status filter."""
         response = client.get(
-            "/api/v1/notifications?status=invalid_status",
+            "/api/v1/notifications/?status=invalid_status",
             headers={"Authorization": "Bearer invalid_token"}
         )
         assert response.status_code in [200, 400, 401, 403]
@@ -303,7 +303,7 @@ class TestNotificationHTTPMethods:
     def test_get_notifications_get_allowed(self, client):
         """Test that GET is allowed for notifications."""
         response = client.get(
-            "/api/v1/notifications",
+            "/api/v1/notifications/",
             headers={"Authorization": "Bearer invalid_token"}
         )
         assert response.status_code in [200, 401, 403]

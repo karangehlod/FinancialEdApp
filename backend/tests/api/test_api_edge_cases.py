@@ -55,14 +55,14 @@ class TestBudgetAPIEdgeCases:
 
     def test_budget_endpoint_without_auth(self, client):
         """Test budget endpoint without authentication."""
-        response = client.get("/api/v1/budgets")
+        response = client.get("/api/v1/budgets/")
         assert response.status_code == 401
 
     def test_budget_create_with_invalid_data(self, client, mock_user_token):
         """Test budget creation with invalid data."""
         with mock_authentication():
             response = client.post(
-                "/api/v1/budgets",
+                "/api/v1/budgets/",
                 headers={"Authorization": mock_user_token},
                 json={"category": "", "allocated_amount": -100, "period": "monthly"}
             )
@@ -74,14 +74,14 @@ class TestExpenseAPIEdgeCases:
 
     def test_expense_endpoint_without_auth(self, client):
         """Test expense endpoint without authentication."""
-        response = client.get("/api/v1/expenses")
+        response = client.get("/api/v1/expenses/")
         assert response.status_code == 401
 
     def test_expense_create_validation_error(self, client, mock_user_token):
         """Test expense creation with validation errors."""
         with mock_authentication():
             response = client.post(
-                "/api/v1/expenses",
+                "/api/v1/expenses/",
                 headers={"Authorization": mock_user_token},
                 json={"amount": -100, "description": "Test", "category": "Food"}
             )
@@ -108,7 +108,7 @@ class TestLoanAPIEdgeCases:
         """Test loan creation with missing required fields."""
         with mock_authentication():
             response = client.post(
-                "/api/v1/loans",
+                "/api/v1/loans/",
                 headers={"Authorization": mock_user_token},
                 json={"principal_amount": 10000.00}  # Missing required fields
             )
@@ -134,7 +134,7 @@ class TestAPIValidationEdgeCases:
     def test_invalid_auth_header(self, client):
         """Test API with invalid auth header."""
         response = client.get(
-            "/api/v1/budgets",
+            "/api/v1/budgets/",
             headers={"Authorization": "Invalid Token"}
         )
         assert response.status_code == 401
@@ -143,7 +143,7 @@ class TestAPIValidationEdgeCases:
         """Test API POST without content type."""
         with mock_authentication():
             response = client.post(
-                "/api/v1/budgets",
+                "/api/v1/budgets/",
                 headers={"Authorization": mock_user_token},
                 data="invalid json"
             )

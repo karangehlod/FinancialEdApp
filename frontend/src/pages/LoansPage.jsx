@@ -11,8 +11,6 @@ import { Trash2, Edit2, Plus, BarChart3 } from 'lucide-react'
 import { formatDate } from '../utils/helpers'
 import { showSuccessToast, showErrorToast } from '../utils/toast'
 import { useState } from 'react'
-import { FluidIcon } from '../components/UI'
-import { FluidGrid } from '../components/FluidGrid'
 
 export const LoansPage = () => {
   const { isAuthenticated, isLoading } = useProtectedRoute()
@@ -167,6 +165,7 @@ export const LoansPage = () => {
         title="Loans"
         subtitle="Track and manage your loans"
         icon={BarChart3}
+        iconSize={'var(--page-icon-size)'}
         iconAlt="Loans"
         action={
           <Button
@@ -177,7 +176,7 @@ export const LoansPage = () => {
             variant="primary"
             className="gap-2"
           >
-            <FluidIcon icon={Plus} size="sm" />
+            <Plus size={20} />
             Add Loan
           </Button>
         }
@@ -185,33 +184,31 @@ export const LoansPage = () => {
         {/* Summary - Total Loan Amount Card */}
         {loans.length > 0 && (
           <motion.div
+            className="mb-6 grid grid-cols-1 lg:grid-cols-3 gap-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="mb-6"
           >
-            <FluidGrid min="240px" className="mb-0 gap-4">
-              {/* Total Loan Amount */}
-              <motion.div
-                className="p-6 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-900/20 rounded-lg border-l-4 border-blue-500 shadow-sm"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.05 }}
-              >
-                <p className="text-gray-600 dark:text-gray-400 text-sm-fluid mb-2">Total Loan Amount</p>
-                <p className="text-stat text-blue-600 dark:text-blue-400">{formatCurrency(totalLoanAmount)}</p>
-                <p className="text-gray-600 dark:text-gray-400 text-sm-fluid mt-2">{loans.length} active loans</p>
-              </motion.div>
+            {/* Total Loan Amount */}
+            <motion.div
+              className="p-6 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-900/20 rounded-lg border-l-4 border-blue-500 shadow-sm"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.05 }}
+            >
+              <p className="text-gray-600 dark:text-gray-400 text-sm mb-2">Total Loan Amount</p>
+              <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{formatCurrency(totalLoanAmount)}</p>
+              <p className="text-gray-600 dark:text-gray-400 text-sm mt-2">{loans.length} active loans</p>
+            </motion.div>
 
-              {/* EMI Summary Card - allow it to span two columns when space allows */}
-              <motion.div
-                style={{ gridColumn: 'span 2' }}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
-              >
-                <EMISummaryCard loans={loans} currency={currency} />
-              </motion.div>
-            </FluidGrid>
+            {/* EMI Summary Card - Takes 2 columns on large screens */}
+            <motion.div
+              className="lg:col-span-2"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+            >
+              <EMISummaryCard loans={loans} currency={currency} />
+            </motion.div>
           </motion.div>
         )}
 
@@ -244,7 +241,7 @@ export const LoansPage = () => {
               >
                 <div className="flex-1">
                   <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">{loan.lender_name || loan.lender || 'Unknown Lender'}</h3>
-                  <FluidGrid min="140px" className="mt-3 text-sm-fluid gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-3 text-sm">
                     <div>
                       <p className="text-gray-500 dark:text-gray-400">Amount</p>
                       <p className="font-semibold text-gray-900 dark:text-gray-100">{formatCurrency(loan.principal_amount || loan.amount || 0)}</p>
@@ -271,27 +268,37 @@ export const LoansPage = () => {
                       <p className="text-gray-500 dark:text-gray-400">Start Date</p>
                       <p className="font-semibold text-gray-900 dark:text-gray-100">{formatDate(loan.start_date)}</p>
                     </div>
-                  </FluidGrid>
+                  </div>
                 </div>
                 <div className="flex gap-2 flex-shrink-0">
-                  <Button
-                    variant="ghost"
-                    size="sm"
+                  <motion.button
                     onClick={() => {
                       setSelectedLoan(loan)
                       setDetailsModalOpen(true)
                     }}
-                    className="!p-2"
+                    className="p-2 hover:bg-indigo-50 rounded-lg text-indigo-600"
                     title="View Details"
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.95 }}
                   >
-                    <FluidIcon icon={BarChart3} size="sm" />
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => handleEdit(loan)} className="!p-2">
-                    <FluidIcon icon={Edit2} size="sm" />
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => handleDelete(loan.id)} className="!p-2 text-red-600">
-                    <FluidIcon icon={Trash2} size="sm" />
-                  </Button>
+                    <BarChart3 size={18} />
+                  </motion.button>
+                  <motion.button
+                    onClick={() => handleEdit(loan)}
+                    className="p-2 hover:bg-blue-50 rounded-lg text-blue-600"
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <Edit2 size={18} />
+                  </motion.button>
+                  <motion.button
+                    onClick={() => handleDelete(loan.id)}
+                    className="p-2 hover:bg-red-50 rounded-lg text-red-600"
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <Trash2 size={18} />
+                  </motion.button>
                 </div>
               </motion.div>
             ))}

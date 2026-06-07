@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { Card, Button, Input, Alert } from '../../components/UI'
 import { motion } from 'framer-motion'
 import { TrendingDown, AlertCircle } from 'lucide-react'
-import { formatCurrency } from '../../utils/helpers'
+import { formatCurrency, formatPercentage } from '../../utils/helpers'
 
 /**
  * Interest Rate Impact Analyzer
@@ -64,15 +64,6 @@ export const RateImpactAnalyzer = ({ loan, currency = 'USD' }) => {
   const isBeneficial = analysis.savings.totalInterest > 0
   const rateIsLower = analysis.savings.rateChange < 0
 
-  // Render a semantic signed currency value. If `decreased` is true we show a unicode minus (−)
-  // to indicate a reduction (savings), otherwise show a plus (+). Use a non-breaking space after sign
-  // to avoid the sign being rendered alone due to wrapping or truncation.
-  const renderSignedCurrency = (value, decreased) => {
-    if (!value) return formatCurrency(0, currency)
-    const sign = decreased ? '\u2212' : '+' // unicode minus for clarity
-    return `${sign}\u00A0${formatCurrency(Math.abs(value), currency)}`
-  }
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -81,6 +72,17 @@ export const RateImpactAnalyzer = ({ loan, currency = 'USD' }) => {
     >
       <Card className="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200">
         <div className="space-y-4">
+          {/* Header */}
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-blue-100 rounded-lg">
+              <TrendingDown className="w-6 h-6 text-blue-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Interest Rate Impact Analyzer</h3>
+              <p className="text-sm text-gray-600">See how changing the interest rate affects your loan</p>
+            </div>
+          </div>
+
           {/* Input Section */}
           <div className="pt-2 space-y-4 border-t border-blue-200">
             <div>
@@ -102,7 +104,7 @@ export const RateImpactAnalyzer = ({ loan, currency = 'USD' }) => {
                   % p.a.
                 </span>
               </div>
-              <p className="text-xs-fluid text-gray-600 mt-1">
+              <p className="text-xs text-gray-600 mt-1">
                 Current rate: <strong>{analysis.current.rate.toFixed(2)}%</strong>
               </p>
             </div>
@@ -145,16 +147,16 @@ export const RateImpactAnalyzer = ({ loan, currency = 'USD' }) => {
               <h4 className="text-sm font-semibold text-gray-700 mb-4">Current Scenario</h4>
               <div className="space-y-3">
                 <div>
-                  <p className="text-xs-fluid text-gray-600">Interest Rate</p>
-                  <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{analysis.current.rate.toFixed(2)}%</p>
+                  <p className="text-xs text-gray-600">Interest Rate</p>
+                  <p className="text-lg font-bold text-gray-900">{analysis.current.rate.toFixed(2)}%</p>
                 </div>
                 <div>
-                  <p className="text-xs-fluid text-gray-600">Monthly EMI</p>
+                  <p className="text-xs text-gray-600">Monthly EMI</p>
                   <p className="text-lg font-bold text-blue-600">{formatCurrency(analysis.current.emi, currency)}</p>
                 </div>
                 <div>
-                  <p className="text-xs-fluid text-gray-600">Total Interest</p>
-                  <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{formatCurrency(analysis.current.totalInterest, currency)}</p>
+                  <p className="text-xs text-gray-600">Total Interest</p>
+                  <p className="text-lg font-bold text-gray-900">{formatCurrency(analysis.current.totalInterest, currency)}</p>
                 </div>
                 <div className="pt-2 border-t border-gray-200">
                   <p className="text-xs text-gray-600">Total Amount to Pay</p>
@@ -168,17 +170,17 @@ export const RateImpactAnalyzer = ({ loan, currency = 'USD' }) => {
               <h4 className="text-sm font-semibold text-gray-700 mb-4">New Scenario @ {newRate.toFixed(2)}%</h4>
               <div className="space-y-3">
                 <div>
-                  <p className="text-xs-fluid text-gray-600">Interest Rate</p>
-                  <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{newRate.toFixed(2)}%</p>
+                  <p className="text-xs text-gray-600">Interest Rate</p>
+                  <p className="text-lg font-bold text-gray-900">{newRate.toFixed(2)}%</p>
                 </div>
                 <div>
-                  <p className="text-xs-fluid text-gray-600">Monthly EMI</p>
+                  <p className="text-xs text-gray-600">Monthly EMI</p>
                   <p className={`text-lg font-bold ${isBeneficial ? 'text-green-600' : 'text-red-600'}`}>
                     {formatCurrency(analysis.new.emi, currency)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs-fluid text-gray-600">Total Interest</p>
+                  <p className="text-xs text-gray-600">Total Interest</p>
                   <p className={`text-lg font-bold ${isBeneficial ? 'text-green-600' : 'text-red-600'}`}>
                     {formatCurrency(analysis.new.totalInterest, currency)}
                   </p>
@@ -196,28 +198,28 @@ export const RateImpactAnalyzer = ({ loan, currency = 'USD' }) => {
           {/* Savings Breakdown */}
           <Card className={`p-4 ${isBeneficial ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
             <h4 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <TrendingDown className={`icon-sm ${isBeneficial ? 'text-green-600' : 'text-red-600'}`} />
+              <TrendingDown className={`w-4 h-4 ${isBeneficial ? 'text-green-600' : 'text-red-600'}`} />
               Impact Summary
             </h4>
             <div className="grid grid-cols-3 gap-4">
               <div>
                 <p className="text-xs text-gray-600 mb-1">Monthly EMI Change</p>
                 <p className={`text-lg font-bold ${isBeneficial ? 'text-green-600' : 'text-red-600'}`}>
-                  {renderSignedCurrency(analysis.savings.monthlyEMI, isBeneficial)}
+                  {isBeneficial ? '-' : '+'}{formatCurrency(Math.abs(analysis.savings.monthlyEMI), currency)}
                 </p>
                 <p className="text-xs text-gray-600 mt-1">{isBeneficial ? 'Save' : 'Pay'} per month</p>
               </div>
               <div>
                 <p className="text-xs text-gray-600 mb-1">Total Interest Savings</p>
                 <p className={`text-lg font-bold ${isBeneficial ? 'text-green-600' : 'text-red-600'}`}>
-                  {renderSignedCurrency(analysis.savings.totalInterest, isBeneficial)}
+                  {isBeneficial ? '-' : '+'}{formatCurrency(Math.abs(analysis.savings.totalInterest), currency)}
                 </p>
                 <p className="text-xs text-gray-600 mt-1">Over loan period</p>
               </div>
               <div>
                 <p className="text-xs text-gray-600 mb-1">Total Amount Saved</p>
                 <p className={`text-lg font-bold ${isBeneficial ? 'text-green-600' : 'text-red-600'}`}>
-                  {renderSignedCurrency(analysis.savings.totalAmount, isBeneficial)}
+                  {isBeneficial ? '-' : '+'}{formatCurrency(Math.abs(analysis.savings.totalAmount), currency)}
                 </p>
                 <p className="text-xs text-gray-600 mt-1">Overall</p>
               </div>

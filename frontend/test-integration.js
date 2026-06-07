@@ -131,7 +131,7 @@ async function runTests() {
 
   if (loginResult.success && loginResult.data.access_token) {
     accessToken = loginResult.data.access_token;
-    console.log(`${colors.gray}  Received access token (stored)${colors.reset}`);
+    console.log(`${colors.gray}  Received access token: ${accessToken.substring(0, 20)}...${colors.reset}`);
   }
 
   // Test 4: Get Current User

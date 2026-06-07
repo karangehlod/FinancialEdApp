@@ -10,9 +10,6 @@ from app.db.models.data import Goal
 from app.schemas.goal import GoalCreate, GoalUpdate, GoalResponse
 from app.core.exceptions import GoalNotFoundError, ValidationError
 from app.core.logging import get_logger
-from app.core.cache_decorator import cache_response, goal_list_key
-from app.core.cache_service import CacheTTL
-from app.core.transaction_decorators import transactional, with_retry
 
 logger = get_logger(__name__)
 
@@ -43,8 +40,6 @@ class GoalService:
 
     # ============== CRUD OPERATIONS ==============
 
-    @transactional(rollback_on_error=True)
-    @with_retry(max_attempts=3, backoff="exponential")
     async def create_goal(self, user_id: UUID, goal_data: GoalCreate) -> Goal:
         """Create a new goal for the user and invalidate the goals cache."""
         try:
@@ -82,25 +77,6 @@ class GoalService:
             raise GoalNotFoundError(str(goal_id))
         return goal
 
-    async def _serialize_goals(self, goals: list[Goal]) -> list:
-        return [
-            {
-                "id": str(g.id),
-                "user_id": str(g.user_id),
-                "goal_name": g.goal_name,
-                "goal_type": g.goal_type,
-                "target_amount": float(g.target_amount),
-                "current_amount": float(g.current_amount),
-                "status": g.status,
-                "priority": g.priority,
-            }
-            for g in goals
-        ]
-
-    def _deserialize_goals(self, data: list):
-        return data
-
-    @cache_response(ttl=CacheTTL.GOAL_LIST, key_func=goal_list_key, serializer_attr="_serialize_goals", deserializer_attr="_deserialize_goals", namespace="goals")
     async def get_user_goals(
         self,
         user_id: UUID,
@@ -114,11 +90,8 @@ class GoalService:
         if goal_type:
             query = query.where(Goal.goal_type == goal_type)
         result = await self.db.execute(query.order_by(Goal.created_at.desc()))
-        goals = result.scalars().all()
-        return goals
+        return result.scalars().all()
 
-    @transactional(rollback_on_error=True)
-    @with_retry(max_attempts=3, backoff="exponential")
     async def update_goal(self, goal_id: UUID, user_id: UUID, goal_data: GoalUpdate) -> Goal:
         """Update a goal and invalidate the goals cache."""
         goal = await self.get_goal(goal_id, user_id)
@@ -137,7 +110,6 @@ class GoalService:
         logger.info(f"Goal updated: {goal_id}")
         return goal
 
-    @transactional(rollback_on_error=True)
     async def delete_goal(self, goal_id: UUID, user_id: UUID) -> bool:
         """Delete a goal and invalidate the goals cache."""
         goal = await self.get_goal(goal_id, user_id)
@@ -152,8 +124,6 @@ class GoalService:
 
     # ============== ANALYTICS OPERATIONS ==============
 
-    @transactional(rollback_on_error=True)
-    @with_retry(max_attempts=3, backoff="exponential")
     async def update_goal_progress(
         self, goal_id: UUID, user_id: UUID, current_amount: Decimal
     ) -> Goal:
@@ -297,24 +267,6 @@ class GoalService:
         
         return goal
     
-    async def _serialize_goals(self, goals: list[Goal]) -> list:
-        return [
-            {
-                "id": str(g.id),
-                "user_id": str(g.user_id),
-                "goal_name": g.goal_name,
-                "goal_type": g.goal_type,
-                "target_amount": float(g.target_amount),
-                "current_amount": float(g.current_amount),
-                "status": g.status,
-                "priority": g.priority,
-            }
-            for g in goals
-        ]
-    
-    def _deserialize_goals(self, data: list):
-        return data
-    
     async def get_user_goals(
         self,
         user_id: UUID,
@@ -331,11 +283,8 @@ class GoalService:
             query = query.where(Goal.goal_type == goal_type)
         
         result = await self.db.execute(query.order_by(Goal.created_at.desc()))
-        goals = result.scalars().all()
-        return goals
+        return result.scalars().all()
     
-    @transactional(rollback_on_error=True)
-    @with_retry(max_attempts=3, backoff="exponential")
     async def update_goal(
         self,
         goal_id: UUID,
@@ -358,7 +307,6 @@ class GoalService:
         logger.info(f"Goal updated: {goal_id}")
         return goal
     
-    @transactional(rollback_on_error=True)
     async def delete_goal(self, goal_id: UUID, user_id: UUID) -> bool:
         """Delete a goal."""
         goal = await self.get_goal(goal_id, user_id)

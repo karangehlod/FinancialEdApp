@@ -1,10 +1,8 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
-
-from app.core.sanitization import sanitize_text
 
 
 class BudgetBase(BaseModel):
@@ -12,12 +10,6 @@ class BudgetBase(BaseModel):
     month: date
     category: str = Field(..., min_length=1, max_length=50)
     recommended_amount: Optional[Decimal] = Field(None, ge=0, decimal_places=2)
-
-    @field_validator("category", mode="before")
-    @classmethod
-    def clean_category(cls, v: Optional[str]) -> Optional[str]:
-        """Strip HTML and control characters from budget category."""
-        return sanitize_text(v, max_length=50) if v else v
 
 
 class BudgetCreate(BudgetBase):

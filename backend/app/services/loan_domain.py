@@ -6,16 +6,8 @@ from enum import Enum
 from typing import Optional
 
 
-class LoanDisplayStatus(str, Enum):
-    """Human-readable loan status for display and domain logic.
-
-    These are the rich display values used in domain objects and
-    exposed to the frontend via the /enums API.
-    Distinct from the DB-storage LoanStatus in schemas/loan.py which
-    maps to the database CHECK constraint values (lowercase).
-
-    Note: ``LoanStatusEnum`` is kept as a backward-compat alias below.
-    """
+class LoanStatusEnum(str, Enum):
+    """Enum for loan statuses."""
     ACTIVE = "Active"
     CLOSED = "Closed"
     PAID_OFF = "Paid Off"
@@ -23,23 +15,12 @@ class LoanDisplayStatus(str, Enum):
     DEFAULTED = "Defaulted"
 
 
-# Backward-compatible alias — use LoanDisplayStatus in new code
-LoanStatusEnum = LoanDisplayStatus
-
-
-class PaymentDisplayStatus(str, Enum):
-    """Human-readable payment status for display and domain logic.
-
-    Note: ``PaymentStatusEnum`` is kept as a backward-compat alias below.
-    """
+class PaymentStatusEnum(str, Enum):
+    """Enum for payment statuses."""
     PAID = "Paid"
     PENDING = "Pending"
     OVERDUE = "Overdue"
     FAILED = "Failed"
-
-
-# Backward-compatible alias — use PaymentDisplayStatus in new code
-PaymentStatusEnum = PaymentDisplayStatus
 
 
 @dataclass(frozen=True)
@@ -223,16 +204,16 @@ class LoanState:
     term: LoanTerm
     remaining_months: int
     next_due_date: date
-    status: LoanDisplayStatus
-
+    status: LoanStatusEnum
+    
     def is_active(self) -> bool:
-        return self.status == LoanDisplayStatus.ACTIVE
-
+        return self.status == LoanStatusEnum.ACTIVE
+    
     def is_paid_off(self) -> bool:
         return self.outstanding_balance.amount == 0
-
+    
     def is_overdue(self) -> bool:
-        return self.status in [LoanDisplayStatus.OVERDUE, LoanDisplayStatus.DEFAULTED]
+        return self.status in [LoanStatusEnum.OVERDUE, LoanStatusEnum.DEFAULTED]
     
     def days_overdue(self) -> int:
         """Calculate days overdue."""

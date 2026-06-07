@@ -3,7 +3,6 @@ import { Card, Button, Input, Select, Alert } from '../../components/UI'
 import { motion } from 'framer-motion'
 import { Zap, TrendingDown } from 'lucide-react'
 import { formatCurrency } from '../../utils/helpers'
-import { FluidGrid } from '../../components/FluidGrid'
 
 /**
  * Prepayment Scenario Analyzer
@@ -118,25 +117,25 @@ export const PrepaymentAnalyzer = ({ loan, currency = 'USD' }) => {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-4 fluid-container"
+      className="space-y-4"
     >
-      <Card className="p-6 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/30 dark:to-pink-900/30 border border-purple-200 dark:border-purple-800 overflow-hidden">
+      <Card className="p-6 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/30 dark:to-pink-900/30 border border-purple-200 dark:border-purple-800">
         <div className="space-y-4">
           {/* Header */}
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="p-2 bg-purple-100 dark:bg-purple-800/50 rounded-lg flex items-center justify-center">
-              <Zap className="icon-md text-purple-600 dark:text-purple-400" />
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-purple-100 dark:bg-purple-800/50 rounded-lg">
+              <Zap className="w-6 h-6 text-purple-600 dark:text-purple-400" />
             </div>
-            <div className="min-w-0">
-              <h3 className="text-lg-fluid font-semibold text-gray-900 dark:text-gray-100 truncate">Prepayment Impact Analyzer</h3>
-              <p className="text-sm-fluid text-gray-600 dark:text-gray-400 truncate">See how extra payments reduce your loan tenure</p>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Prepayment Impact Analyzer</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">See how extra payments reduce your loan tenure</p>
             </div>
           </div>
 
           {/* Input Section */}
           <div className="pt-2 space-y-4 border-t border-purple-200 dark:border-purple-700">
             <div>
-              <label className="block text-sm-fluid font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Extra Payment Amount
               </label>
               <Input
@@ -148,13 +147,13 @@ export const PrepaymentAnalyzer = ({ loan, currency = 'USD' }) => {
                 min="0"
                 className="w-full"
               />
-              <p className="text-xs-fluid text-gray-600 dark:text-gray-400 mt-1">
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
                 Current EMI: <strong>{formatCurrency(parseFloat(loan.emi_amount || 0), currency)}</strong>
               </p>
             </div>
 
             <div>
-              <label className="block text-sm-fluid font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Payment Type
               </label>
               <Select
@@ -192,104 +191,101 @@ export const PrepaymentAnalyzer = ({ loan, currency = 'USD' }) => {
           />
 
           {/* Comparison */}
-          <FluidGrid min="240px">
+          <div className="grid grid-cols-2 gap-4">
             {/* Current */}
-            <Card className="p-4 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 overflow-hidden">
-              <h4 className="text-sm-fluid font-semibold text-gray-700 dark:text-gray-300 mb-4">Current Loan</h4>
+            <Card className="p-4 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700">
+              <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">Current Loan</h4>
               <div className="space-y-3">
                 <div>
-                  <p className="text-xs-fluid text-gray-600 dark:text-gray-400">Monthly Payment</p>
-                  <p className="text-lg-fluid font-bold text-blue-600 dark:text-blue-400 truncate">{formatCurrency(analysis.current.emi, currency)}</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Monthly Payment</p>
+                  <p className="text-lg font-bold text-blue-600 dark:text-blue-400">{formatCurrency(analysis.current.emi, currency)}</p>
                 </div>
                 <div>
-                  <p className="text-xs-fluid text-gray-600 dark:text-gray-400">Tenure</p>
-                  <p className="text-lg-fluid font-bold text-gray-900 dark:text-gray-100 truncate">{analysis.current.months} months</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Tenure</p>
+                  <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{analysis.current.months} months</p>
                 </div>
                 <div>
-                  <p className="text-xs-fluid text-gray-600 dark:text-gray-400">Total Interest</p>
-                  <p className="text-lg-fluid font-bold text-gray-900 dark:text-gray-100 truncate">{formatCurrency(analysis.current.totalInterest, currency)}</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Total Interest</p>
+                  <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{formatCurrency(analysis.current.totalInterest, currency)}</p>
                 </div>
                 <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
-                  <p className="text-xs-fluid text-gray-600 dark:text-gray-400">Loan Ends</p>
-                  <p className="text-sm-fluid font-semibold text-gray-900 dark:text-gray-100 truncate">{analysis.current.endDate.toLocaleDateString()}</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Loan Ends</p>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{analysis.current.endDate.toLocaleDateString()}</p>
                 </div>
               </div>
             </Card>
 
             {/* With Prepayment */}
-            <Card className="p-4 bg-green-50 dark:bg-green-900/30 border-2 border-green-300 dark:border-green-700 overflow-hidden">
-              <h4 className="text-sm-fluid font-semibold text-gray-700 dark:text-gray-300 mb-4">With {paymentType === 'one_time' ? 'Prepayment' : 'Extra Payment'}</h4>
+            <Card className="p-4 bg-green-50 dark:bg-green-900/30 border-2 border-green-300 dark:border-green-700">
+              <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">With {paymentType === 'one_time' ? 'Prepayment' : 'Extra Payment'}</h4>
               <div className="space-y-3">
                 <div>
-                  <p className="text-xs-fluid text-gray-600 dark:text-gray-400">Monthly Payment</p>
-                  <p className="text-lg-fluid font-bold text-green-600 dark:text-green-400 truncate">{formatCurrency(scenario.newEMI, currency)}</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Monthly Payment</p>
+                  <p className="text-lg font-bold text-green-600 dark:text-green-400">{formatCurrency(scenario.newEMI, currency)}</p>
                 </div>
                 <div>
-                  <p className="text-xs-fluid text-gray-600 dark:text-gray-400">New Tenure</p>
-                  <p className="text-lg-fluid font-bold text-green-600 dark:text-green-400 truncate">
+                  <p className="text-xs text-gray-600 dark:text-gray-400">New Tenure</p>
+                  <p className="text-lg font-bold text-green-600 dark:text-green-400">
                     {paymentType === 'one_time' ? analysis.current.months : scenario.newMonths || analysis.current.months} months
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs-fluid text-gray-600 dark:text-gray-400">Total Interest</p>
-                  <p className="text-lg-fluid font-bold text-green-600 dark:text-green-400 truncate">{formatCurrency(scenario.newTotalInterest, currency)}</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Total Interest</p>
+                  <p className="text-lg font-bold text-green-600 dark:text-green-400">{formatCurrency(scenario.newTotalInterest, currency)}</p>
                 </div>
                 <div className="pt-2 border-t border-green-300 dark:border-green-700">
-                  <p className="text-xs-fluid text-gray-600 dark:text-gray-400">Loan Ends</p>
-                  <p className="text-sm-fluid font-semibold text-green-600 dark:text-green-400 truncate">{scenario.newEndDate.toLocaleDateString()}</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Loan Ends</p>
+                  <p className="text-sm font-semibold text-green-600 dark:text-green-400">{scenario.newEndDate.toLocaleDateString()}</p>
                 </div>
               </div>
             </Card>
-          </FluidGrid>
+          </div>
 
           {/* Savings Summary */}
-          <Card className="p-4 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 overflow-hidden">
-            <h4 className="text-sm-fluid font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
-              <TrendingDown className="icon-sm text-green-600 dark:text-green-400" />
+          <Card className="p-4 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800">
+            <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
+              <TrendingDown className="w-4 h-4 text-green-600 dark:text-green-400" />
               Savings Summary
             </h4>
-            <FluidGrid min="160px">
+            <div className="grid grid-cols-3 gap-4">
               <div>
-                <p className="text-xs-fluid text-gray-600 dark:text-gray-400 mb-1">Interest Saved</p>
-                <p className="text-lg-fluid font-bold text-green-600 dark:text-green-400 truncate">{formatCurrency(scenario.interestSaved, currency)}</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Interest Saved</p>
+                <p className="text-lg font-bold text-green-600 dark:text-green-400">{formatCurrency(scenario.interestSaved, currency)}</p>
               </div>
               <div>
-                <p className="text-xs-fluid text-gray-600 dark:text-gray-400 mb-1">Time Saved</p>
-                <p className="text-lg-fluid font-bold text-green-600 dark:text-green-400 truncate">
+                <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Time Saved</p>
+                <p className="text-lg font-bold text-green-600 dark:text-green-400">
                   {paymentType === 'one_time' ? '-' : `${scenario.monthsSaved} months`}
                 </p>
               </div>
               <div>
-                <p className="text-xs-fluid text-gray-600 dark:text-gray-400 mb-1">Total Amount Saved</p>
-                <p className="text-lg-fluid font-bold text-green-600 dark:text-green-400 truncate">{formatCurrency(scenario.totalAmountSaved, currency)}</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Total Amount Saved</p>
+                <p className="text-lg font-bold text-green-600 dark:text-green-400">{formatCurrency(scenario.totalAmountSaved, currency)}</p>
               </div>
-            </FluidGrid>
+            </div>
           </Card>
 
           {/* Quick Scenarios */}
           {paymentType === 'recurring' && (
-            <Card className="p-4 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 overflow-hidden">
-              <h4 className="text-sm-fluid font-semibold text-blue-900 dark:text-blue-300 mb-3">💡 Quick Prepayment Options</h4>
-              <div className="space-y-2 text-sm-fluid">
+            <Card className="p-4 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800">
+              <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-300 mb-3">💡 Quick Prepayment Options</h4>
+              <div className="space-y-2 text-sm">
                 {[
                   { pct: 10, label: '10% more (faster payoff)' },
                   { pct: 25, label: '25% more (significant savings)' },
                   { pct: 50, label: '50% more (aggressive prepayment)' },
                 ].map((option) => (
-                  <Button
+                  <button
                     key={option.pct}
                     onClick={() => setExtraAmount(Math.round((parseFloat(loan.emi_amount || 0) * option.pct) / 100))}
-                    variant="ghost"
-                    size="sm"
-                    className="w-full text-left"
+                    className="w-full text-left p-2 rounded hover:bg-blue-100 dark:hover:bg-blue-800/50 transition-colors text-gray-900 dark:text-gray-100"
                   >
-                    <div className="flex flex-col items-start min-w-0">
-                      <strong className="truncate">{option.label}</strong>
-                      <span className="text-xs-fluid text-gray-600 dark:text-gray-400 mt-0.5 truncate">
-                        Extra: {formatCurrency(Math.round((parseFloat(loan.emi_amount || 0) * option.pct) / 100), currency)}/month
-                      </span>
-                    </div>
-                  </Button>
+                    <strong>{option.label}</strong>
+                    <br />
+                    <span className="text-xs text-gray-600 dark:text-gray-400">
+                      Extra: {formatCurrency(Math.round((parseFloat(loan.emi_amount || 0) * option.pct) / 100), currency)}/month
+                    </span>
+                  </button>
                 ))}
               </div>
             </Card>

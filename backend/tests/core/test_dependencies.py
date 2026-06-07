@@ -21,30 +21,23 @@ class TestRedisCacheManagement:
     """Test Redis cache dependency management."""
 
     def test_get_redis_cache_initial_state(self):
-        """Test getting Redis cache when not set (app.state has no cache)."""
-        mock_request = MagicMock()
-        # Simulate app.state with no 'cache' attribute
-        del mock_request.app.state.cache
-        mock_request.app.state = MagicMock(spec=[])
-
-        result = get_redis_cache(mock_request)
+        """Test getting Redis cache when not set."""
+        # Reset global cache
+        import app.dependencies
+        app.dependencies._redis_cache = None
+        
+        result = get_redis_cache()
         assert result is None
 
-    def test_get_redis_cache_with_cache_set(self):
-        """Test getting Redis cache when set on app.state."""
-        mock_cache = MagicMock(spec=RedisCache)
-        mock_request = MagicMock()
-        mock_request.app.state.cache = mock_cache
-
-        result = get_redis_cache(mock_request)
-        assert result == mock_cache
-
     @pytest.mark.asyncio
-    async def test_set_redis_cache_is_noop(self):
-        """Test that set_redis_cache is a no-op shim (backward compat)."""
+    async def test_set_and_get_redis_cache(self):
+        """Test setting and getting Redis cache."""
         mock_cache = MagicMock(spec=RedisCache)
-        # Should not raise
+        
         await set_redis_cache(mock_cache)
+        result = get_redis_cache()
+        
+        assert result == mock_cache
 
     def test_security_bearer_scheme(self):
         """Test HTTP Bearer security scheme configuration."""
@@ -197,39 +190,36 @@ class TestDependencyIntegration:
 
     @pytest.mark.asyncio
     async def test_dependencies_with_redis_cache(self):
-        """Test that Redis cache can be retrieved from app.state properly."""
+        """Test that Redis cache can be set and retrieved properly."""
+        # Reset the global cache first
+        import app.dependencies
+        app.dependencies._redis_cache = None
+        
         mock_cache = MagicMock(spec=RedisCache)
-
-        # Simulate request with no cache on app.state
-        mock_request_empty = MagicMock()
-        mock_request_empty.app.state = MagicMock(spec=[])
-        assert get_redis_cache(mock_request_empty) is None
-
-        # Simulate request with cache on app.state
-        mock_request_with_cache = MagicMock()
-        mock_request_with_cache.app.state.cache = mock_cache
-        assert get_redis_cache(mock_request_with_cache) == mock_cache
-
-        # set_redis_cache is a no-op shim
+        
+        # Initially no cache
+        assert get_redis_cache() is None
+        
+        # Set cache
         await set_redis_cache(mock_cache)
-
+        
+        # Verify cache is set
+        assert get_redis_cache() == mock_cache
+        
         # Test multiple retrievals
-        assert get_redis_cache(mock_request_with_cache) == mock_cache
-        assert get_redis_cache(mock_request_with_cache) == mock_cache
+        assert get_redis_cache() == mock_cache
+        assert get_redis_cache() == mock_cache
 
     @pytest.mark.asyncio  
     async def test_auth_flow_simple(self):
         """Test simple authentication flow components."""
+        # Test basic functionality instead of complex mocking
         mock_cache = MagicMock(spec=RedisCache)
-
-        # set_redis_cache is a no-op shim; should not raise
+        
+        # Set up Redis cache
         await set_redis_cache(mock_cache)
-
-        # get_redis_cache reads from app.state via request
-        mock_request = MagicMock()
-        mock_request.app.state.cache = mock_cache
-        assert get_redis_cache(mock_request) == mock_cache
-
+        assert get_redis_cache() == mock_cache
+        
         # Test that the function exists and can be imported
         from app.dependencies import get_current_active_user
         assert get_current_active_user is not None

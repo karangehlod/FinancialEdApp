@@ -446,18 +446,18 @@ class TestExpenseRepository:
     
     @pytest.mark.asyncio
     async def test_delete_expense_success(self, expense_repo, sample_expense, user_id, expense_id):
-        """Test soft-deleting an expense successfully."""
+        """Test deleting an expense successfully."""
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = sample_expense
         expense_repo.db.execute = AsyncMock(return_value=mock_result)
+        expense_repo.db.delete = AsyncMock()
         expense_repo.db.commit = AsyncMock()
-
+        
         result = await expense_repo.delete(expense_id, user_id)
-
+        
         assert result is True
-        # Soft delete: commit is called, and the expense is marked deleted
+        expense_repo.db.delete.assert_called_once()
         expense_repo.db.commit.assert_called_once()
-        assert sample_expense.is_deleted
     
     @pytest.mark.asyncio
     async def test_delete_expense_not_found(self, expense_repo, user_id, expense_id):
@@ -488,13 +488,12 @@ class TestExpenseRepository:
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = MagicMock()
         expense_repo.db.execute = AsyncMock(return_value=mock_result)
-        # Soft delete calls commit; simulate a commit failure
-        expense_repo.db.commit = AsyncMock(side_effect=Exception("DB Error"))
+        expense_repo.db.delete = AsyncMock(side_effect=Exception("DB Error"))
         expense_repo.db.rollback = AsyncMock()
-
+        
         with pytest.raises(DatabaseError):
             await expense_repo.delete(expense_id, user_id)
-
+        
         expense_repo.db.rollback.assert_called_once()
     
     # ============== GET_SUMMARY TESTS ==============

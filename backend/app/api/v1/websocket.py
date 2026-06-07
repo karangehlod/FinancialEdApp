@@ -39,7 +39,7 @@ from app.core.websocket_manager import (
     get_connection_manager,
     make_notification,
 )
-from app.core.security_compat import decode_token
+from app.core.security import decode_token
 from app.config import settings
 
 logger = logging.getLogger(__name__)

@@ -2,65 +2,40 @@
 
 from fastapi import Request, status
 from fastapi.responses import JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
 import logging
 import time
 import uuid
 from typing import Callable, Optional
-from datetime import datetime, timezone
+from datetime import datetime
 import json
-import secrets
-from app.core.cache import get_metadata
-from email.utils import parsedate_to_datetime
 
 logger = logging.getLogger(__name__)
 
 
 class SecurityHeadersMiddleware:
-    """
-    Middleware to add security headers to all responses.
-
-    CSP policy:
-    - Production: ``script-src 'self'`` — no unsafe-inline, protects against XSS.
-    - Development: ``script-src 'self' 'unsafe-inline'`` — relaxed to support
-      hot-module-replacement and browser DevTools without breaking DX.
-      Gated on ``ENVIRONMENT == "development"``.
-
-    style-src keeps ``'unsafe-inline'`` because Tailwind CSS injects inline
-    styles at runtime; removing it would break the UI.  A future migration to
-    CSS-in-JS hashes can tighten this further.
-    """
-
+    """Middleware to add security headers to all responses."""
+    
     def __init__(self, app):
         self.app = app
-
+    
     async def __call__(self, request: Request, call_next: Callable):
         """Add security headers to response."""
         response = await call_next(request)
-
-        # Determine environment to gate unsafe-inline on script-src
-        try:
-            from app.config import settings
-            is_dev = settings.ENVIRONMENT == "development"
-        except Exception:
-            is_dev = False
-
-        script_src = "'self' 'unsafe-inline'" if is_dev else "'self'"
-
+        
+        # Strict-Transport-Security
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+        
         # Content Security Policy
         response.headers["Content-Security-Policy"] = (
-            f"default-src 'self'; "
-            f"script-src {script_src}; "
-            "style-src 'self' 'unsafe-inline'; "   # Tailwind requires inline styles
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data: https:; "
             "font-src 'self'; "
             "connect-src 'self'; "
             "form-action 'self'; "
             "frame-ancestors 'none';"
         )
-
-        # Strict-Transport-Security
-        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
         
         # X-Content-Type-Options
         response.headers["X-Content-Type-Options"] = "nosniff"
@@ -386,89 +361,3 @@ def _extract_client_ip(request: Request) -> str:
     if request.client:
         return request.client.host
     return "unknown"
-
-
-class ConditionalGetMiddleware(BaseHTTPMiddleware):
-    """Middleware that checks Redis-stored metadata (ETag, Last-Modified) and
-    handles conditional GETs (If-None-Match / If-Modified-Since) returning 304
-    when appropriate to avoid unnecessary payload generation.
-
-    This middleware expects a Redis client available at `request.app.state.cache`.
-    It does not itself fetch the full cached payload — that is handled by route
-    decorators which may set the response body and headers on cache misses.
-    """
-
-    def __init__(self, app, namespace_map: dict | None = None):
-        """namespace_map maps path prefixes to cache namespace strings.
-
-        e.g. {"/api/v1/expenses": "expenses", "/api/v1/budgets": "budgets"}
-        """
-        super().__init__(app)
-        self.namespace_map = namespace_map or {
-            "/api/v1/expenses": "expenses",
-            "/api/v1/budgets": "budgets",
-            "/api/v1/goals": "goals",
-        }
-
-    async def dispatch(self, request: Request, call_next: Callable):
-        # Only handle GET requests
-        if request.method != "GET":
-            return await call_next(request)
-
-        # Find matching namespace for the request path
-        namespace = None
-        for prefix, ns in self.namespace_map.items():
-            if request.url.path.startswith(prefix):
-                namespace = ns
-                break
-
-        if not namespace:
-            return await call_next(request)
-
-        # Build a logical key from path + sorted query params
-        query_str = _canonical_query_string(dict(request.query_params))
-        logical_key = f"{request.url.path}?{query_str}" if query_str else request.url.path
-
-        redis_client = getattr(request.app.state, "cache", None)
-        if not redis_client:
-            return await call_next(request)
-
-        meta = await get_metadata(redis_client, namespace, logical_key)
-        if not meta:
-            # No metadata available — let the request proceed and the route
-            # decorator will populate metadata on response
-            return await call_next(request)
-
-        # If-None-Match handling
-        if_none_match = request.headers.get("if-none-match")
-        if if_none_match and meta.get("etag") and if_none_match.strip() == meta.get("etag"):
-            # Short-circuit 304
-            return JSONResponse(status_code=status.HTTP_304_NOT_MODIFIED, headers={"X-Cache": "HIT"})
-
-        # If-Modified-Since handling
-        if_modified_since = request.headers.get("if-modified-since")
-        if if_modified_since and meta.get("last_modified"):
-            try:
-                req_dt = parsedate_to_datetime(if_modified_since)
-                meta_dt = parsedate_to_datetime(meta.get("last_modified"))
-                if meta_dt <= req_dt:
-                    return JSONResponse(status_code=status.HTTP_304_NOT_MODIFIED, headers={"X-Cache": "HIT"})
-            except Exception:
-                pass
-
-        # Otherwise proceed; route is free to return cached body or generate new one.
-        response = await call_next(request)
-
-        # Attach X-Cache header if route didn't set it
-        if "X-Cache" not in response.headers:
-            response.headers["X-Cache"] = "MISS"
-
-        return response
-
-
-def _canonical_query_string(query_params: dict) -> str:
-    """Return a canonical string representation of sorted query parameters."""
-    from urllib.parse import urlencode
-    # Sort by key, then by value
-    sorted_items = sorted(query_params.items())
-    return urlencode(sorted_items)

@@ -103,11 +103,10 @@ class TestConversationStoreRedis:
         msgs = [HumanMessage(content="q"), AIMessage(content="a")]
         await store.save_history("r-conv-1", msgs)
 
-        # save_history calls redis.set twice: once for history, once for meta
-        assert redis.set.await_count >= 1
-        # Verify first call used the correct key prefix
-        first_call_key = redis.set.call_args_list[0].args[0]
-        assert "chat:conv:r-conv-1" in first_call_key
+        # Verify redis.set was called
+        redis.set.assert_awaited_once()
+        call_args = redis.set.call_args
+        assert "chat:conv:r-conv-1" in call_args.args or call_args.args[0] == "chat:conv:r-conv-1"
 
         # Now set up redis.get to return the stored data
         import json
@@ -140,8 +139,7 @@ class TestConversationStoreRedis:
         redis = self._make_redis_mock()
         store = ConversationStore(redis_client=redis)
         await store.delete_conversation("del-conv")
-        # delete_conversation calls redis.delete for both history and meta keys
-        assert redis.delete.await_count >= 1
+        redis.delete.assert_awaited_once()
 
 
 # ---------------------------------------------------------------------------
@@ -200,8 +198,6 @@ class TestChatServiceWithAgent:
         svc._agent = self._make_agent_mock("reply")
 
         conv_id = "my-conv-123"
-        # Register the conversation as belonging to user "u1" first
-        await svc._store.add_user_conversation("u1", conv_id)
         result = await svc.send_message(
             user_id="u1", message="hi", conversation_id=conv_id
         )
@@ -224,18 +220,14 @@ class TestChatServiceWithAgent:
         svc._agent = self._make_agent_mock("first reply")
 
         conv_id = str(uuid.uuid4())
-        # First message — no conversation_id ownership check needed (new conv)
-        await svc.send_message(user_id="u1", message="msg1")
-
-        # Register conv_id for subsequent messages with the same user
-        await svc._store.add_user_conversation("u1", conv_id)
+        await svc.send_message(user_id="u1", message="msg1", conversation_id=conv_id)
 
         svc._agent = self._make_agent_mock("second reply")
         await svc.send_message(user_id="u1", message="msg2", conversation_id=conv_id)
 
         history_result = await svc.get_history(conv_id)
-        # Should have 2 messages from the second call (user + ai)
-        assert len(history_result["messages"]) >= 2
+        # Should have 4 messages: user1, ai1, user2, ai2
+        assert len(history_result["messages"]) == 4
 
     @pytest.mark.asyncio
     @patch("app.services.chat.chat_service.settings")
@@ -248,13 +240,8 @@ class TestChatServiceWithAgent:
         svc._agent = self._make_agent_mock("reply")
 
         conv_id = str(uuid.uuid4())
-        # First message doesn't need pre-registration (new conv)
-        svc._agent = self._make_agent_mock("reply-0")
-        await svc.send_message(user_id="u1", message="msg-0")
-
-        # Register conv_id then send further messages using that id
-        await svc._store.add_user_conversation("u1", conv_id)
-        for i in range(1, 5):
+        # Send 5 messages — should trim to 4 (2 turns * 2)
+        for i in range(5):
             svc._agent = self._make_agent_mock(f"reply-{i}")
             await svc.send_message(
                 user_id="u1", message=f"msg-{i}", conversation_id=conv_id
@@ -282,9 +269,8 @@ class TestChatServiceConversations:
     @pytest.mark.asyncio
     async def test_get_conversations(self):
         svc = _make_service()
-        # Use create_conversation_for_user so the conversations are associated with "u1"
-        await svc.create_conversation_for_user("u1")
-        await svc.create_conversation_for_user("u1")
+        await svc.create_conversation()
+        await svc.create_conversation()
 
         result = await svc.get_conversations("u1")
         assert len(result["conversations"]) >= 2

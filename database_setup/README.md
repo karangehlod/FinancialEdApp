@@ -173,23 +173,6 @@ For production, use managed database services:
 
 This local setup is for **development only**.
 
-## Idempotent index creation (ops)
-
-For production you may wish to create additional CONCURRENT indexes as a one-off ops task.
-Run the included script which issues idempotent CREATE INDEX CONCURRENTLY IF NOT EXISTS statements.
-
-Usage (zsh):
-
-  DATABASE_URL="postgresql://user:pass@host:5432/financial_data_db" ./ops/create_indexes_postgres.sh
-
-Notes:
-- `CREATE INDEX CONCURRENTLY` must be executed outside a transaction and is safe to run on a primary.
-- The script is idempotent: re-running it is a no-op for already-existing indexes.
-- Run against each target database (auth DB vs data DB) as appropriate.
-- Ensure the `pg_trgm` extension is available before creating trigram/Gin indexes.
-
-If you cannot run the script, you can execute the same commands via `psql -c "<SQL>"` as documented in the PRODUCTION_FIX_PLAN.
-
 ## Network Architecture
 
 ```

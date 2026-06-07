@@ -24,7 +24,15 @@ import pyotp
 from datetime import datetime, timedelta
 from jose import jwt
 
-from tests.live.conftest import _mint_token
+from tests.conftest_live import (
+    make_user,
+    live_client,
+    authed_client,
+    auth_headers_for,
+    auth_db,
+    data_db,
+    _mint_token,
+)
 from app.config import settings
 
 pytestmark = [pytest.mark.asyncio, pytest.mark.live, pytest.mark.live_auth]
@@ -37,10 +45,10 @@ API = settings.API_V1_PREFIX  # "/api/v1"
 # =============================================================================
 
 class TestRegistration:
-    """Verify user signup creates an account and returns user profile."""
+    """Verify user signup creates an account and returns tokens."""
 
-    async def test_register_returns_201_and_user(self, live_client):
-        """Happy path: valid payload → 201 with user profile."""
+    async def test_register_returns_201_and_tokens(self, live_client):
+        """Happy path: valid payload → 201 with access + refresh tokens."""
         email = f"reg_{uuid.uuid4().hex[:8]}@example.com"
         resp = await live_client.post(f"{API}/auth/register", json={
             "email": email,
@@ -49,12 +57,12 @@ class TestRegistration:
         })
         assert resp.status_code == 201, resp.text
         body = resp.json()
-        assert "id" in body
-        assert body["email"] == email.lower()
-        assert body["is_active"] is True
+        assert "access_token" in body
+        assert "refresh_token" in body
+        assert body.get("token_type", "").lower() == "bearer"
 
-    async def test_register_duplicate_email_returns_400(self, live_client, make_user):
-        """Registering with an already-used email must be rejected with 400."""
+    async def test_register_duplicate_email_returns_409(self, live_client, make_user):
+        """Registering with an already-used email must be rejected with 409."""
         email = f"dup_{uuid.uuid4().hex[:8]}@example.com"
         await make_user(email=email)  # pre-create via fixture
 
@@ -63,7 +71,7 @@ class TestRegistration:
             "password": "AnotherPass456!",
             "name": "Bob Dev",
         })
-        assert resp.status_code == 400, resp.text
+        assert resp.status_code == 409, resp.text
 
     async def test_register_weak_password_returns_422(self, live_client):
         """Passwords shorter than 8 chars (or no uppercase/digit) are rejected."""

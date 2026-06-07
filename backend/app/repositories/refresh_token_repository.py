@@ -66,7 +66,6 @@ class RefreshTokenRepository:
         Returns:
             The newly created ``RefreshToken`` ORM record.
         """
-        # Use token_hash column (HMAC-SHA256 fingerprint of the raw token)
         record = RefreshToken(
             user_id=user_id,
             token_hash=token_hash,
@@ -146,6 +145,7 @@ class RefreshTokenRepository:
         Returns:
             The newly created ``RefreshToken`` ORM record.
         """
+        # Step 1: create the new token (flush only — no commit yet)
         new_record = await self.create(
             user_id=new_user_id,
             token_hash=new_token_hash,
@@ -153,11 +153,13 @@ class RefreshTokenRepository:
             device_info=device_info,
             auto_commit=False,
         )
+        # Step 2: revoke the old token, linking to the new record (no commit yet)
         await self.revoke(
             token_hash=old_token_hash,
             replaced_by=new_record.id,
             auto_commit=False,
         )
+        # Step 3: single atomic commit for both operations
         await self._db.commit()
         await self._db.refresh(new_record)
         logger.info(
@@ -228,31 +230,3 @@ class RefreshTokenRepository:
         deleted = result.rowcount
         logger.info("Purged %d expired refresh tokens", deleted)
         return deleted
-
-    async def revoke_all_for_user(self, user_id: UUID) -> int:
-        """
-        Revoke all currently active (non-revoked) refresh tokens for a user.
-
-        Performs a single UPDATE and returns the number of rows affected.
-        This is used for security actions like password change or detected token
-        reuse where all sessions must be invalidated immediately.
-        """
-        result = await self._db.execute(
-            update(RefreshToken)
-            .where(
-                and_(
-                    RefreshToken.user_id == user_id,
-                    RefreshToken.is_revoked == False,  # noqa: E712
-                )
-            )
-            .values(
-                is_revoked=True,
-                revoked_at=datetime.now(timezone.utc).replace(tzinfo=None),
-                replaced_by=None,
-            )
-            .returning(RefreshToken.id)
-        )
-        await self._db.commit()
-        count = result.rowcount or 0
-        logger.info("Revoked %d refresh tokens for user %s", count, user_id)
-        return count

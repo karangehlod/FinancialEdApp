@@ -135,5 +135,3 @@ class RefreshToken(AuthBase):
     device_info = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=False), server_default=func.now())
     revoked_at = Column(DateTime(timezone=False), nullable=True)
-    # Timestamp when this token was rotated (if replaced by a newer token)
-    rotated_at = Column(DateTime(timezone=False), nullable=True)

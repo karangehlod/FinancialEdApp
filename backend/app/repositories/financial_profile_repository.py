@@ -4,7 +4,7 @@ from typing import Optional
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from datetime import datetime, timezone
+from datetime import datetime
 
 from app.db.models.data import UserFinancialProfile
 from app.schemas.financial_profile import FinancialProfileCreate, FinancialProfileUpdate
@@ -60,7 +60,7 @@ class FinancialProfileRepository:
             if hasattr(profile, field):
                 setattr(profile, field, value)
         
-        profile.updated_at = datetime.now(timezone.utc)
+        profile.updated_at = datetime.utcnow()
         await self.db.commit()
         await self.db.refresh(profile)
         return profile

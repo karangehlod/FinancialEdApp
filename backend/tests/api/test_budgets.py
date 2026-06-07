@@ -45,9 +45,9 @@ class TestFinancialProfileEndpoints:
     """Test financial profile management endpoints."""
     
     def test_create_financial_profile(self, client):
-        """Test creating/updating financial profile."""
-        response = client.put(
-            "/api/v1/auth/financial-profile",
+        """Test creating financial profile."""
+        response = client.post(
+            "/api/v1/budgets/profile",
             json={
                 "monthly_salary": 50000.0,
                 "total_emi": 10000.0,
@@ -57,24 +57,24 @@ class TestFinancialProfileEndpoints:
             },
             headers={"Authorization": "Bearer invalid_token"}
         )
-        assert response.status_code in [200, 201, 401, 403, 400, 422]
+        assert response.status_code in [201, 401, 403, 400, 422]
     
     def test_create_profile_missing_monthly_salary(self, client):
-        """Test profile update without monthly salary (all fields optional in PUT)."""
-        response = client.put(
-            "/api/v1/auth/financial-profile",
+        """Test profile creation without monthly salary."""
+        response = client.post(
+            "/api/v1/budgets/profile",
             json={
                 "total_emi": 10000.0,
                 "rent": 15000.0
             },
             headers={"Authorization": "Bearer invalid_token"}
         )
-        assert response.status_code in [200, 422, 401, 403]
+        assert response.status_code in [422, 401, 403]
     
     def test_create_profile_negative_salary(self, client):
-        """Test profile update with negative salary."""
-        response = client.put(
-            "/api/v1/auth/financial-profile",
+        """Test profile creation with negative salary."""
+        response = client.post(
+            "/api/v1/budgets/profile",
             json={
                 "monthly_salary": -50000.0,
                 "total_emi": 10000.0,
@@ -82,12 +82,12 @@ class TestFinancialProfileEndpoints:
             },
             headers={"Authorization": "Bearer invalid_token"}
         )
-        assert response.status_code in [200, 400, 422, 401, 403]
+        assert response.status_code in [400, 422, 401, 403]
     
     def test_create_profile_zero_salary(self, client):
-        """Test profile update with zero salary."""
-        response = client.put(
-            "/api/v1/auth/financial-profile",
+        """Test profile creation with zero salary."""
+        response = client.post(
+            "/api/v1/budgets/profile",
             json={
                 "monthly_salary": 0,
                 "total_emi": 10000.0,
@@ -95,12 +95,12 @@ class TestFinancialProfileEndpoints:
             },
             headers={"Authorization": "Bearer invalid_token"}
         )
-        assert response.status_code in [200, 400, 422, 401, 403]
+        assert response.status_code in [400, 422, 401, 403]
     
     def test_create_profile_negative_emi(self, client):
-        """Test profile update with negative EMI."""
-        response = client.put(
-            "/api/v1/auth/financial-profile",
+        """Test profile creation with negative EMI."""
+        response = client.post(
+            "/api/v1/budgets/profile",
             json={
                 "monthly_salary": 50000.0,
                 "total_emi": -10000.0,
@@ -108,12 +108,12 @@ class TestFinancialProfileEndpoints:
             },
             headers={"Authorization": "Bearer invalid_token"}
         )
-        assert response.status_code in [200, 400, 422, 401, 403]
+        assert response.status_code in [400, 422, 401, 403]
     
     def test_create_profile_negative_rent(self, client):
-        """Test profile update with negative rent."""
-        response = client.put(
-            "/api/v1/auth/financial-profile",
+        """Test profile creation with negative rent."""
+        response = client.post(
+            "/api/v1/budgets/profile",
             json={
                 "monthly_salary": 50000.0,
                 "total_emi": 10000.0,
@@ -121,12 +121,12 @@ class TestFinancialProfileEndpoints:
             },
             headers={"Authorization": "Bearer invalid_token"}
         )
-        assert response.status_code in [200, 400, 422, 401, 403]
+        assert response.status_code in [400, 422, 401, 403]
     
     def test_create_profile_with_all_optional_fields(self, client):
-        """Test profile update with all optional fields."""
-        response = client.put(
-            "/api/v1/auth/financial-profile",
+        """Test profile creation with all optional fields."""
+        response = client.post(
+            "/api/v1/budgets/profile",
             json={
                 "monthly_salary": 50000.0,
                 "total_emi": 10000.0,
@@ -137,12 +137,12 @@ class TestFinancialProfileEndpoints:
             },
             headers={"Authorization": "Bearer invalid_token"}
         )
-        assert response.status_code in [200, 201, 401, 403, 400, 422]
+        assert response.status_code in [201, 401, 403, 400, 422]
     
     def test_get_financial_profile(self, client):
         """Test retrieving financial profile."""
         response = client.get(
-            "/api/v1/auth/financial-profile",
+            "/api/v1/budgets/profile",
             headers={"Authorization": "Bearer invalid_token"}
         )
         assert response.status_code in [200, 401, 403, 404]
@@ -150,7 +150,7 @@ class TestFinancialProfileEndpoints:
     def test_update_financial_profile(self, client):
         """Test updating financial profile."""
         response = client.put(
-            "/api/v1/auth/financial-profile",
+            "/api/v1/budgets/profile",
             json={
                 "monthly_salary": 60000.0,
                 "total_emi": 12000.0,
@@ -163,7 +163,7 @@ class TestFinancialProfileEndpoints:
     def test_update_profile_partial(self, client):
         """Test partial update of financial profile."""
         response = client.put(
-            "/api/v1/auth/financial-profile",
+            "/api/v1/budgets/profile",
             json={
                 "monthly_salary": 60000.0
             },
@@ -180,7 +180,7 @@ class TestBudgetCRUDEndpoints:
     def test_create_budget(self, client):
         """Test creating a budget."""
         response = client.post(
-            "/api/v1/budgets",
+            "/api/v1/budgets/",
             json={
                 "category": "Food",
                 "limit": 5000.0,
@@ -194,7 +194,7 @@ class TestBudgetCRUDEndpoints:
     def test_create_budget_missing_category(self, client):
         """Test creating budget without category."""
         response = client.post(
-            "/api/v1/budgets",
+            "/api/v1/budgets/",
             json={
                 "limit": 5000.0,
                 "month": "2025-01"
@@ -206,7 +206,7 @@ class TestBudgetCRUDEndpoints:
     def test_create_budget_missing_limit(self, client):
         """Test creating budget without limit."""
         response = client.post(
-            "/api/v1/budgets",
+            "/api/v1/budgets/",
             json={
                 "category": "Food",
                 "month": "2025-01"
@@ -218,7 +218,7 @@ class TestBudgetCRUDEndpoints:
     def test_create_budget_negative_limit(self, client):
         """Test creating budget with negative limit."""
         response = client.post(
-            "/api/v1/budgets",
+            "/api/v1/budgets/",
             json={
                 "category": "Food",
                 "limit": -5000.0,
@@ -231,7 +231,7 @@ class TestBudgetCRUDEndpoints:
     def test_create_budget_zero_limit(self, client):
         """Test creating budget with zero limit."""
         response = client.post(
-            "/api/v1/budgets",
+            "/api/v1/budgets/",
             json={
                 "category": "Food",
                 "limit": 0,
@@ -244,7 +244,7 @@ class TestBudgetCRUDEndpoints:
     def test_create_budget_invalid_threshold(self, client):
         """Test creating budget with invalid alert threshold."""
         response = client.post(
-            "/api/v1/budgets",
+            "/api/v1/budgets/",
             json={
                 "category": "Food",
                 "limit": 5000.0,
@@ -258,7 +258,7 @@ class TestBudgetCRUDEndpoints:
     def test_get_all_budgets(self, client):
         """Test retrieving all budgets."""
         response = client.get(
-            "/api/v1/budgets",
+            "/api/v1/budgets/",
             headers={"Authorization": "Bearer invalid_token"}
         )
         assert response.status_code in [200, 401, 403]
@@ -266,7 +266,7 @@ class TestBudgetCRUDEndpoints:
     def test_get_budgets_with_filter(self, client):
         """Test retrieving budgets with filter."""
         response = client.get(
-            "/api/v1/budgets?category=Food",
+            "/api/v1/budgets/?category=Food",
             headers={"Authorization": "Bearer invalid_token"}
         )
         assert response.status_code in [200, 401, 403]
@@ -274,7 +274,7 @@ class TestBudgetCRUDEndpoints:
     def test_get_budgets_by_month(self, client):
         """Test retrieving budgets by month."""
         response = client.get(
-            "/api/v1/budgets?month=2025-01",
+            "/api/v1/budgets/?month=2025-01",
             headers={"Authorization": "Bearer invalid_token"}
         )
         assert response.status_code in [200, 401, 403]
@@ -514,7 +514,7 @@ class TestBudgetEdgeCases:
     def test_create_multiple_budgets_same_category_month(self, client):
         """Test creating multiple budgets for same category and month."""
         response1 = client.post(
-            "/api/v1/budgets",
+            "/api/v1/budgets/",
             json={
                 "category": "Food",
                 "limit": 5000.0,
@@ -524,7 +524,7 @@ class TestBudgetEdgeCases:
         )
         
         response2 = client.post(
-            "/api/v1/budgets",
+            "/api/v1/budgets/",
             json={
                 "category": "Food",
                 "limit": 6000.0,
@@ -539,7 +539,7 @@ class TestBudgetEdgeCases:
     def test_budget_limit_greater_than_salary(self, client):
         """Test budget limit greater than monthly salary."""
         response = client.post(
-            "/api/v1/budgets",
+            "/api/v1/budgets/",
             json={
                 "category": "Food",
                 "limit": 500000.0,
@@ -552,7 +552,7 @@ class TestBudgetEdgeCases:
     def test_very_high_alert_threshold(self, client):
         """Test with very high alert threshold."""
         response = client.post(
-            "/api/v1/budgets",
+            "/api/v1/budgets/",
             json={
                 "category": "Food",
                 "limit": 5000.0,
@@ -566,7 +566,7 @@ class TestBudgetEdgeCases:
     def test_zero_alert_threshold(self, client):
         """Test with zero alert threshold."""
         response = client.post(
-            "/api/v1/budgets",
+            "/api/v1/budgets/",
             json={
                 "category": "Food",
                 "limit": 5000.0,
@@ -580,7 +580,7 @@ class TestBudgetEdgeCases:
     def test_negative_alert_threshold(self, client):
         """Test with negative alert threshold."""
         response = client.post(
-            "/api/v1/budgets",
+            "/api/v1/budgets/",
             json={
                 "category": "Food",
                 "limit": 5000.0,
@@ -594,7 +594,7 @@ class TestBudgetEdgeCases:
     def test_invalid_month_format(self, client):
         """Test with invalid month format."""
         response = client.post(
-            "/api/v1/budgets",
+            "/api/v1/budgets/",
             json={
                 "category": "Food",
                 "limit": 5000.0,
@@ -607,7 +607,7 @@ class TestBudgetEdgeCases:
     def test_future_month_budget(self, client):
         """Test creating budget for future month."""
         response = client.post(
-            "/api/v1/budgets",
+            "/api/v1/budgets/",
             json={
                 "category": "Food",
                 "limit": 5000.0,
@@ -620,7 +620,7 @@ class TestBudgetEdgeCases:
     def test_past_month_budget(self, client):
         """Test creating budget for past month."""
         response = client.post(
-            "/api/v1/budgets",
+            "/api/v1/budgets/",
             json={
                 "category": "Food",
                 "limit": 5000.0,
@@ -633,7 +633,7 @@ class TestBudgetEdgeCases:
     def test_very_small_budget_limit(self, client):
         """Test with very small budget limit."""
         response = client.post(
-            "/api/v1/budgets",
+            "/api/v1/budgets/",
             json={
                 "category": "Food",
                 "limit": 0.01,
@@ -646,7 +646,7 @@ class TestBudgetEdgeCases:
     def test_very_large_budget_limit(self, client):
         """Test with very large budget limit."""
         response = client.post(
-            "/api/v1/budgets",
+            "/api/v1/budgets/",
             json={
                 "category": "Food",
                 "limit": 9999999999.99,
@@ -665,7 +665,7 @@ class TestBudgetHTTPMethods:
     def test_budgets_list_get_allowed(self, client):
         """Test that GET is allowed for budgets list."""
         response = client.get(
-            "/api/v1/budgets",
+            "/api/v1/budgets/",
             headers={"Authorization": "Bearer invalid_token"}
         )
         assert response.status_code in [200, 401, 403]
@@ -673,7 +673,7 @@ class TestBudgetHTTPMethods:
     def test_budgets_list_post_allowed(self, client):
         """Test that POST is allowed for budgets creation."""
         response = client.post(
-            "/api/v1/budgets",
+            "/api/v1/budgets/",
             json={
                 "category": "Food",
                 "limit": 5000.0,
@@ -686,16 +686,16 @@ class TestBudgetHTTPMethods:
     def test_profile_get_allowed(self, client):
         """Test that GET is allowed for profile."""
         response = client.get(
-            "/api/v1/auth/financial-profile",
+            "/api/v1/budgets/profile",
             headers={"Authorization": "Bearer invalid_token"}
         )
         assert response.status_code in [200, 401, 403, 404]
     
     def test_profile_post_allowed(self, client):
-        """Test that PUT is allowed for profile (profile uses PUT, not POST)."""
-        response = client.put(
-            "/api/v1/auth/financial-profile",
+        """Test that POST is allowed for profile."""
+        response = client.post(
+            "/api/v1/budgets/profile",
             json={"monthly_salary": 50000.0},
             headers={"Authorization": "Bearer invalid_token"}
         )
-        assert response.status_code in [200, 201, 401, 403, 400, 422]
+        assert response.status_code in [201, 401, 403, 400, 422]

@@ -10,19 +10,8 @@ import {
   ChevronLeft, ChevronRight, Ban, CheckCircle, Server, Database,
   TrendingUp, UserPlus, BarChart3,
 } from 'lucide-react'
-import { FluidGrid } from '../components/FluidGrid'
 
 /* ── Metric Card ───────────────────────────────────────────────────────── */
-const colorClassMap = {
-  blue: 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
-  green: 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400',
-  purple: 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400',
-  orange: 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400',
-  red: 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400',
-  indigo: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400',
-  teal: 'bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400',
-}
-
 const MetricCard = ({ icon: Icon, label, value, color = 'blue', subtitle }) => (
   <motion.div
     initial={{ opacity: 0, y: 12 }}
@@ -30,13 +19,13 @@ const MetricCard = ({ icon: Icon, label, value, color = 'blue', subtitle }) => (
     className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 shadow-sm"
   >
     <div className="flex items-center gap-3">
-      <div className={`p-3 rounded-lg ${colorClassMap[color] || colorClassMap.blue}`}>
-        <Icon style={{ width: 'var(--icon-sm)', height: 'var(--icon-sm)' }} />
+      <div className={`p-3 rounded-lg bg-${color}-100 dark:bg-${color}-900/30`}>
+        <Icon style={{ width: 'var(--icon-sm)', height: 'var(--icon-sm)', color: `var(--${color}-600, #000)` }} />
       </div>
       <div>
-        <p className="text-sm-fluid text-gray-500 dark:text-gray-400">{label}</p>
-        <p className="text-value font-bold text-gray-900 dark:text-white">{value ?? '—'}</p>
-        {subtitle && <p className="text-xs-fluid text-gray-400 dark:text-gray-500 mt-0.5">{subtitle}</p>}
+        <p className="text-sm text-gray-500 dark:text-gray-400">{label}</p>
+        <p className="text-2xl font-bold text-gray-900 dark:text-white">{value ?? '—'}</p>
+        {subtitle && <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{subtitle}</p>}
       </div>
     </div>
   </motion.div>
@@ -160,9 +149,9 @@ export const AdminPage = () => {
         <PageContainer title="Admin Dashboard" subtitle="Access restricted">
           <Card className="p-8 text-center bg-white dark:bg-gray-800">
             <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-            <h3 className="text-heading-lg font-semibold text-gray-900 dark:text-white mb-2">Access Denied</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Access Denied</h3>
             <p className="text-gray-600 dark:text-gray-400">{error}</p>
-            <p className="text-sm-fluid text-gray-500 dark:text-gray-500 mt-2">
+            <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
               Admin access is granted to users listed in the <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">ADMIN_EMAILS</code> environment variable.
             </p>
           </Card>
@@ -184,16 +173,18 @@ export const AdminPage = () => {
         {/* Tab Navigation */}
         <div className="flex gap-1 mb-6 bg-gray-100 dark:bg-gray-800 rounded-lg p-1 overflow-x-auto">
           {tabs.map(({ id, label, icon: TabIcon }) => (
-            <Button
+            <button
               key={id}
-              size="sm"
-              variant={activeTab === id ? 'secondary' : 'ghost'}
               onClick={() => setActiveTab(id)}
-              className={`px-3 py-1 rounded-md text-sm-fluid font-medium whitespace-nowrap ${activeTab === id ? 'shadow-sm' : ''}`}
+              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
+                activeTab === id
+                  ? 'bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+              }`}
             >
               <TabIcon className="w-4 h-4" />
               {label}
-            </Button>
+            </button>
           ))}
         </div>
 
@@ -201,14 +192,14 @@ export const AdminPage = () => {
         {activeTab === 'overview' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-heading-lg font-bold text-gray-900 dark:text-white">Platform Metrics</h2>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Platform Metrics</h2>
               <Button variant="secondary" onClick={fetchMetrics} className="flex items-center gap-2">
                 <RefreshCw className="w-4 h-4" /> Refresh
               </Button>
             </div>
 
             {metrics ? (
-              <FluidGrid min="220px" className="gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <MetricCard icon={Users} label="Total Users" value={metrics.total_users} color="blue" />
                 <MetricCard icon={Activity} label="Active (24h)" value={metrics.active_users_24h} color="green" />
                 <MetricCard icon={TrendingUp} label="Active (7d)" value={metrics.active_users_7d} color="purple" />
@@ -216,7 +207,7 @@ export const AdminPage = () => {
                 <MetricCard icon={BarChart3} label="Total Expenses" value={metrics.total_expenses} color="red" />
                 <MetricCard icon={BarChart3} label="Total Budgets" value={metrics.total_budgets} color="indigo" />
                 <MetricCard icon={BarChart3} label="Total Goals" value={metrics.total_goals} color="teal" />
-              </FluidGrid>
+              </div>
             ) : (
               <div className="flex justify-center py-12"><LoadingSpinner /></div>
             )}
@@ -225,36 +216,36 @@ export const AdminPage = () => {
             {health && (
               <Card className="p-6 bg-white dark:bg-gray-800">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Infrastructure Status</h3>
-                <FluidGrid min="200px" className="gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   {Object.entries(health.checks || {}).map(([name, status]) => (
                     <div key={name} className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
                       <div className={`w-3 h-3 rounded-full ${status === 'healthy' ? 'bg-green-500' : 'bg-red-500'}`} />
                       <div>
-                        <p className="text-sm-fluid font-medium text-gray-900 dark:text-white capitalize">{name.replace('_', ' ')}</p>
-                        <p className="text-xs-fluid text-gray-500 dark:text-gray-400">{status}</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white capitalize">{name.replace('_', ' ')}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{status}</p>
                       </div>
                     </div>
                   ))}
-                </FluidGrid>
-               </Card>
-             )}
-           </div>
-         )}
+                </div>
+              </Card>
+            )}
+          </div>
+        )}
 
         {/* ── Users Tab ────────────────────────────────────────────────── */}
         {activeTab === 'users' && (
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-              <h2 className="text-heading-lg font-bold text-gray-900 dark:text-white">User Management</h2>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">User Management</h2>
               <form onSubmit={handleSearch} className="flex gap-2 w-full sm:w-auto">
                 <div className="relative flex-1 sm:w-64">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <Input
+                  <input
                     type="text"
                     placeholder="Search by email..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 input-fluid"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none"
                   />
                 </div>
                 <Button type="submit" variant="secondary">Search</Button>
@@ -267,7 +258,7 @@ export const AdminPage = () => {
                 <div className="flex justify-center py-12"><LoadingSpinner /></div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm-fluid">
+                  <table className="w-full text-sm">
                     <thead className="bg-gray-50 dark:bg-gray-700/50">
                       <tr>
                         <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Email</th>
@@ -287,25 +278,27 @@ export const AdminPage = () => {
                             {user.totp_enabled ? (
                               <span className="text-green-600 dark:text-green-400 text-xs font-medium">Enabled</span>
                             ) : (
-                              <span className="text-gray-400 dark:text-gray-500 text-xs-fluid">Off</span>
+                              <span className="text-gray-400 dark:text-gray-500 text-xs">Off</span>
                             )}
                           </td>
-                          <td className="hidden md:table-cell px-4 py-3 text-gray-600 dark:text-gray-400 text-xs-fluid">
+                          <td className="hidden md:table-cell px-4 py-3 text-gray-600 dark:text-gray-400 text-xs">
                             {user.last_login ? new Date(user.last_login).toLocaleDateString() : '—'}
                           </td>
-                          <td className="hidden md:table-cell px-4 py-3 text-gray-600 dark:text-gray-400 text-xs-fluid">
+                          <td className="hidden md:table-cell px-4 py-3 text-gray-600 dark:text-gray-400 text-xs">
                             {user.created_at ? new Date(user.created_at).toLocaleDateString() : '—'}
                           </td>
                           <td className="px-4 py-3 text-right">
-                            <Button
-                              size="sm"
-                              variant={user.is_active ? 'danger' : 'secondary'}
+                            <button
                               onClick={() => handleSuspendToggle(user.id, user.is_active)}
-                              className="px-2 py-1"
+                              className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
+                                user.is_active
+                                  ? 'bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/40'
+                                  : 'bg-green-50 text-green-700 hover:bg-green-100 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/40'
+                              }`}
                             >
                               {user.is_active ? <Ban className="w-3 h-3" /> : <CheckCircle className="w-3 h-3" />}
                               <span className="hidden sm:inline">{user.is_active ? ' Suspend' : ' Activate'}</span>
-                            </Button>
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -324,16 +317,24 @@ export const AdminPage = () => {
               {/* Pagination */}
               {usersPagination.pages > 1 && (
                 <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-700">
-                  <p className="text-sm-fluid text-gray-600 dark:text-gray-400">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
                     Showing page {usersPagination.page} of {usersPagination.pages} ({usersPagination.total} total)
                   </p>
                   <div className="flex gap-2">
-                    <Button size="sm" variant="ghost" onClick={() => fetchUsers(usersPagination.page - 1, searchQuery)} disabled={usersPagination.page <= 1} className="p-2">
+                    <button
+                      disabled={usersPagination.page <= 1}
+                      onClick={() => fetchUsers(usersPagination.page - 1, searchQuery)}
+                      className="p-2 rounded-md border border-gray-300 dark:border-gray-600 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-700"
+                    >
                       <ChevronLeft className="w-4 h-4" />
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => fetchUsers(usersPagination.page + 1, searchQuery)} disabled={usersPagination.page >= usersPagination.pages} className="p-2">
+                    </button>
+                    <button
+                      disabled={usersPagination.page >= usersPagination.pages}
+                      onClick={() => fetchUsers(usersPagination.page + 1, searchQuery)}
+                      className="p-2 rounded-md border border-gray-300 dark:border-gray-600 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-700"
+                    >
                       <ChevronRight className="w-4 h-4" />
-                    </Button>
+                    </button>
                   </div>
                 </div>
               )}
@@ -345,7 +346,7 @@ export const AdminPage = () => {
         {activeTab === 'health' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-heading-lg font-bold text-gray-900 dark:text-white">Infrastructure Health</h2>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Infrastructure Health</h2>
               <Button variant="secondary" onClick={fetchHealth} className="flex items-center gap-2">
                 <RefreshCw className="w-4 h-4" /> Refresh
               </Button>
@@ -355,12 +356,12 @@ export const AdminPage = () => {
               <Card className="p-6 bg-white dark:bg-gray-800">
                 <div className="flex items-center gap-3 mb-6">
                   <div className={`w-4 h-4 rounded-full ${health.status === 'healthy' ? 'bg-green-500' : 'bg-yellow-500'}`} />
-                  <span className="text-heading-lg font-semibold text-gray-900 dark:text-white capitalize">{health.status}</span>
-                  <span className="text-xs-fluid text-gray-500 dark:text-gray-400">
+                  <span className="text-lg font-semibold text-gray-900 dark:text-white capitalize">{health.status}</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
                     Checked: {new Date(health.checked_at).toLocaleString()}
                   </span>
                 </div>
-                <FluidGrid min="220px" className="gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {Object.entries(health.checks || {}).map(([name, status]) => (
                     <div
                       key={name}
@@ -380,65 +381,65 @@ export const AdminPage = () => {
                           {name.replace(/_/g, ' ')}
                         </span>
                       </div>
-                      <p className="text-sm-fluid text-gray-600 dark:text-gray-400">{status}</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">{status}</p>
                     </div>
                   ))}
-                </FluidGrid>
-               </Card>
-             ) : (
-               <div className="flex justify-center py-12"><LoadingSpinner /></div>
-             )}
-           </div>
-         )}
+                </div>
+              </Card>
+            ) : (
+              <div className="flex justify-center py-12"><LoadingSpinner /></div>
+            )}
+          </div>
+        )}
 
-         {/* ── Audit Log Tab ────────────────────────────────────────────── */}
-         {activeTab === 'audit' && (
-           <div className="space-y-4">
-             <div className="flex items-center justify-between">
-               <h2 className="text-heading-lg font-bold text-gray-900 dark:text-white">Audit Log</h2>
-               <Button variant="secondary" onClick={fetchAuditLog} className="flex items-center gap-2">
-                 <RefreshCw className="w-4 h-4" /> Refresh
-               </Button>
-             </div>
+        {/* ── Audit Log Tab ────────────────────────────────────────────── */}
+        {activeTab === 'audit' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Audit Log</h2>
+              <Button variant="secondary" onClick={fetchAuditLog} className="flex items-center gap-2">
+                <RefreshCw className="w-4 h-4" /> Refresh
+              </Button>
+            </div>
 
-             <Card className="overflow-hidden bg-white dark:bg-gray-800">
-               {auditLog.length > 0 ? (
-                 <div className="overflow-x-auto">
-                   <table className="w-full text-sm-fluid">
-                     <thead className="bg-gray-50 dark:bg-gray-700/50">
-                       <tr>
-                         <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Table</th>
-                         <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Record ID</th>
-                         <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Deleted By</th>
-                         <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Reason</th>
-                         <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Date</th>
-                       </tr>
-                     </thead>
-                     <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                       {auditLog.map((entry, i) => (
-                         <tr key={entry.id || i} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                           <td className="px-4 py-3 text-gray-900 dark:text-white">{entry.table_name}</td>
-                           <td className="px-4 py-3 text-gray-600 dark:text-gray-400 text-xs font-mono">{entry.record_id}</td>
-                           <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{entry.deleted_by}</td>
-                           <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{entry.reason || '—'}</td>
-                           <td className="px-4 py-3 text-gray-600 dark:text-gray-400 text-xs-fluid">
-                             {entry.created_at ? new Date(entry.created_at).toLocaleString() : '—'}
-                           </td>
-                         </tr>
-                       ))}
-                     </tbody>
-                   </table>
-                 </div>
-               ) : (
-                 <div className="py-12 text-center text-gray-500 dark:text-gray-400">
-                   <Shield className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                   <p>No audit log entries yet.</p>
-                 </div>
-               )}
-             </Card>
-           </div>
-         )}
-       </PageContainer>
-     </Layout>
-   )
- }
+            <Card className="overflow-hidden bg-white dark:bg-gray-800">
+              {auditLog.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 dark:bg-gray-700/50">
+                      <tr>
+                        <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Table</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Record ID</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Deleted By</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Reason</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                      {auditLog.map((entry, i) => (
+                        <tr key={entry.id || i} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                          <td className="px-4 py-3 text-gray-900 dark:text-white">{entry.table_name}</td>
+                          <td className="px-4 py-3 text-gray-600 dark:text-gray-400 text-xs font-mono">{entry.record_id}</td>
+                          <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{entry.deleted_by}</td>
+                          <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{entry.reason || '—'}</td>
+                          <td className="px-4 py-3 text-gray-600 dark:text-gray-400 text-xs">
+                            {entry.created_at ? new Date(entry.created_at).toLocaleString() : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="py-12 text-center text-gray-500 dark:text-gray-400">
+                  <Shield className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                  <p>No audit log entries yet.</p>
+                </div>
+              )}
+            </Card>
+          </div>
+        )}
+      </PageContainer>
+    </Layout>
+  )
+}

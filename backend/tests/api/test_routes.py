@@ -20,7 +20,7 @@ class TestExpensesEndpoint:
     def test_create_expense_missing_amount(self, client):
         """Test creating expense without amount."""
         response = client.post(
-            "/api/v1/expenses",
+            "/api/v1/expenses/",
             json={"category": "Food", "date": "2026-01-15"},
             headers={"Authorization": "Bearer invalid_token"}
         )
@@ -30,7 +30,7 @@ class TestExpensesEndpoint:
     def test_create_expense_missing_category(self, client):
         """Test creating expense without category."""
         response = client.post(
-            "/api/v1/expenses",
+            "/api/v1/expenses/",
             json={"amount": 50.0, "date": "2026-01-15"},
             headers={"Authorization": "Bearer invalid_token"}
         )
@@ -74,9 +74,9 @@ class TestBudgetsEndpoint:
     """Test budgets API endpoints."""
     
     def test_create_financial_profile(self, client):
-        """Test creating/updating financial profile via PUT."""
-        response = client.put(
-            "/api/v1/auth/financial-profile",
+        """Test creating financial profile."""
+        response = client.post(
+            "/api/v1/budgets/profile",
             json={
                 "monthly_salary": 5000.0,
                 "total_emi": 1000.0,
@@ -89,7 +89,7 @@ class TestBudgetsEndpoint:
     def test_get_financial_profile(self, client):
         """Test getting financial profile."""
         response = client.get(
-            "/api/v1/auth/financial-profile",
+            "/api/v1/budgets/profile",
             headers={"Authorization": "Bearer invalid_token"}
         )
         assert response.status_code in [200, 401, 403, 404]
@@ -133,7 +133,7 @@ class TestLoansEndpoint:
     def test_create_loan_endpoint(self, client):
         """Test creating loan."""
         response = client.post(
-            "/api/v1/loans",
+            "/api/v1/loans/",
             json={
                 "lender_name": "Bank",
                 "loan_amount": 100000.0,
@@ -147,7 +147,7 @@ class TestLoansEndpoint:
     def test_get_loans_endpoint(self, client):
         """Test getting loans."""
         response = client.get(
-            "/api/v1/loans",
+            "/api/v1/loans/",
             headers={"Authorization": "Bearer invalid_token"}
         )
         assert response.status_code in [200, 401, 403]
@@ -167,7 +167,7 @@ class TestGoalsEndpoint:
     def test_create_goal_endpoint(self, client):
         """Test creating goal."""
         response = client.post(
-            "/api/v1/goals",
+            "/api/v1/goals/",
             json={
                 "name": "Save for car",
                 "target_amount": 500000.0,
@@ -180,7 +180,7 @@ class TestGoalsEndpoint:
     def test_get_goals_endpoint(self, client):
         """Test getting goals."""
         response = client.get(
-            "/api/v1/goals",
+            "/api/v1/goals/",
             headers={"Authorization": "Bearer invalid_token"}
         )
         assert response.status_code in [200, 401, 403]
@@ -192,7 +192,7 @@ class TestNotificationsEndpoint:
     def test_get_notifications_endpoint(self, client):
         """Test getting notifications."""
         response = client.get(
-            "/api/v1/notifications",
+            "/api/v1/notifications/",
             headers={"Authorization": "Bearer invalid_token"}
         )
         assert response.status_code in [200, 401, 403]
@@ -283,17 +283,17 @@ class TestAPIAuthentication:
     
     def test_loans_requires_auth(self, client):
         """Test loans endpoint requires authentication."""
-        response = client.get("/api/v1/loans")
+        response = client.get("/api/v1/loans/")
         assert response.status_code in [401, 403]
     
     def test_goals_requires_auth(self, client):
         """Test goals endpoint requires authentication."""
-        response = client.get("/api/v1/goals")
+        response = client.get("/api/v1/goals/")
         assert response.status_code in [401, 403]
     
     def test_notifications_requires_auth(self, client):
         """Test notifications endpoint requires authentication."""
-        response = client.get("/api/v1/notifications")
+        response = client.get("/api/v1/notifications/")
         assert response.status_code in [401, 403]
     
     def test_health_does_not_require_auth(self, client):

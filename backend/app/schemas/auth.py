@@ -2,7 +2,6 @@ from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 from datetime import datetime
 from uuid import UUID
-from app.core.validation import sanitize_string, validate_password
 
 
 class UserRegister(BaseModel):
@@ -10,25 +9,6 @@ class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8, max_length=100)
     full_name: Optional[str] = None
-
-    # validators
-    @classmethod
-    def __get_validators__(cls):
-        yield from super().__get_validators__()
-
-    @staticmethod
-    def validate_password_field(v):
-        return validate_password(v)
-
-    @classmethod
-    def validate(cls, values):
-        # pydantic's BaseModel.validate isn't intended for this, but
-        # we keep simple: sanitize full_name if present
-        if 'full_name' in values and values['full_name'] is not None:
-            values['full_name'] = sanitize_string(values['full_name'])
-        # validate password pattern
-        values['password'] = validate_password(values['password'])
-        return values
 
 
 class UserCreate(BaseModel):

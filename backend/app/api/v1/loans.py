@@ -3,7 +3,7 @@ from typing import List, Optional
 from datetime import date
 from decimal import Decimal
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_current_user
@@ -19,42 +19,19 @@ from app.schemas.loan import (
     PrepaymentAnalysisResponse
 )
 from app.services.loan_service import LoanService
-from app.core.validation_decorators import validate_loan_input
-from app.core.error_handling_decorators import (
-    log_operation,
-    audit_log,
-    handle_db_errors,
-)
-from app.core.rate_limiting_decorators import rate_limit, apply_preset_limit
-from app.core.logging import get_logger
-
-logger = get_logger(__name__)
 
 router = APIRouter(prefix="/loans", tags=["loans"])
 
 
-def get_loan_service(
-    db: AsyncSession = Depends(get_data_db),
-) -> LoanService:
-    """Dependency factory — builds a LoanService per request."""
-    return LoanService(db)
-
-
 @router.post("", response_model=LoanResponse, status_code=status.HTTP_201_CREATED)
-@apply_preset_limit("create")
-@validate_loan_input
-@log_operation("create_loan", include_args=False, include_result=False)
-@audit_log(action="create", resource_type="loan")
-@handle_db_errors(rollback_on_error=True)
 async def create_loan(
     loan_data: LoanCreate,
     current_user: User = Depends(get_current_user),
-    loan_service: LoanService = Depends(get_loan_service),
-    request: Request = None,
-    response: Response = None,
+    db: AsyncSession = Depends(get_data_db)
 ):
     """Create a new loan."""
     try:
+        loan_service = LoanService(db)
         loan = await loan_service.create_loan(current_user.id, loan_data)
         return loan
     except Exception as e:
@@ -67,16 +44,14 @@ async def create_loan(
 @router.get("", response_model=List[LoanResponse])
 async def get_loans(
     status_filter: Optional[str] = Query(None, alias="status"),
-    skip: int = Query(0, ge=0, description="Number of records to skip"),
-    limit: int = Query(50, ge=1, le=500, description="Max records to return (hard cap: 500)"),
     current_user: User = Depends(get_current_user),
-    loan_service: LoanService = Depends(get_loan_service)
+    db: AsyncSession = Depends(get_data_db)
 ):
     """Get all loans for the current user."""
     try:
+        loan_service = LoanService(db)
         loans = await loan_service.get_user_loans(current_user.id, status_filter)
-        # Apply pagination at the service layer result (service doesn't yet support offset/limit)
-        return loans[skip : skip + limit]
+        return loans
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -88,10 +63,11 @@ async def get_loans(
 async def get_loan(
     loan_id: UUID,
     current_user: User = Depends(get_current_user),
-    loan_service: LoanService = Depends(get_loan_service)
+    db: AsyncSession = Depends(get_data_db)
 ):
     """Get a specific loan by ID."""
     try:
+        loan_service = LoanService(db)
         loan = await loan_service.get_loan(current_user.id, loan_id)
         
         if not loan:
@@ -111,21 +87,15 @@ async def get_loan(
 
 
 @router.put("/{loan_id}", response_model=LoanResponse)
-@apply_preset_limit("update")
-@validate_loan_input
-@log_operation("update_loan", include_args=False, include_result=False)
-@audit_log(action="update", resource_type="loan")
-@handle_db_errors(rollback_on_error=True)
 async def update_loan(
     loan_id: UUID,
     loan_data: LoanUpdate,
     current_user: User = Depends(get_current_user),
-    loan_service: LoanService = Depends(get_loan_service),
-    request: Request = None,
-    response: Response = None,
+    db: AsyncSession = Depends(get_data_db)
 ):
     """Update a specific loan."""
     try:
+        loan_service = LoanService(db)
         loan = await loan_service.update_loan(current_user.id, loan_id, loan_data)
         
         if not loan:
@@ -145,19 +115,14 @@ async def update_loan(
 
 
 @router.delete("/{loan_id}", status_code=status.HTTP_204_NO_CONTENT)
-@apply_preset_limit("delete")
-@log_operation("delete_loan")
-@audit_log(action="delete", resource_type="loan")
-@handle_db_errors(rollback_on_error=True)
 async def delete_loan(
     loan_id: UUID,
     current_user: User = Depends(get_current_user),
-    loan_service: LoanService = Depends(get_loan_service),
-    request: Request = None,
-    response: Response = None,
+    db: AsyncSession = Depends(get_data_db)
 ):
     """Delete a specific loan."""
     try:
+        loan_service = LoanService(db)
         success = await loan_service.delete_loan(current_user.id, loan_id)
         
         if not success:
@@ -177,20 +142,15 @@ async def delete_loan(
 
 
 @router.post("/{loan_id}/payments", response_model=LoanPaymentResponse, status_code=status.HTTP_201_CREATED)
-@apply_preset_limit("payment")
-@log_operation("make_loan_payment", include_args=False, include_result=False)
-@audit_log(action="create", resource_type="loan_payment")
-@handle_db_errors(rollback_on_error=True)
 async def make_payment(
     loan_id: UUID,
     payment_data: LoanPaymentCreate,
     current_user: User = Depends(get_current_user),
-    loan_service: LoanService = Depends(get_loan_service),
-    request: Request = None,
-    response: Response = None,
+    db: AsyncSession = Depends(get_data_db)
 ):
     """Make a payment towards a loan."""
     try:
+        loan_service = LoanService(db)
         payment = await loan_service.make_payment(current_user.id, loan_id, payment_data)
         
         if not payment:
@@ -213,10 +173,11 @@ async def make_payment(
 async def get_loan_payments(
     loan_id: UUID,
     current_user: User = Depends(get_current_user),
-    loan_service: LoanService = Depends(get_loan_service)
+    db: AsyncSession = Depends(get_data_db)
 ):
     """Get all payments for a specific loan."""
     try:
+        loan_service = LoanService(db)
         # First check if loan exists
         loan = await loan_service.get_loan(current_user.id, loan_id)
         if not loan:
@@ -240,10 +201,11 @@ async def get_loan_payments(
 async def get_repayment_schedule(
     loan_id: UUID,
     current_user: User = Depends(get_current_user),
-    loan_service: LoanService = Depends(get_loan_service)
+    db: AsyncSession = Depends(get_data_db)
 ):
     """Get repayment schedule for a specific loan."""
     try:
+        loan_service = LoanService(db)
         # First check if loan exists
         loan = await loan_service.get_loan(current_user.id, loan_id)
         if not loan:
@@ -267,10 +229,11 @@ async def get_repayment_schedule(
 async def get_loan_summary(
     loan_id: UUID,
     current_user: User = Depends(get_current_user),
-    loan_service: LoanService = Depends(get_loan_service)
+    db: AsyncSession = Depends(get_data_db)
 ):
     """Get comprehensive summary for a specific loan."""
     try:
+        loan_service = LoanService(db)
         summary = await loan_service.get_loan_summary(current_user.id, loan_id)
         
         if not summary:
@@ -293,10 +256,11 @@ async def get_loan_summary(
 @router.get("/analytics/overview", response_model=LoanAnalytics)
 async def get_loan_analytics(
     current_user: User = Depends(get_current_user),
-    loan_service: LoanService = Depends(get_loan_service)
+    db: AsyncSession = Depends(get_data_db)
 ):
     """Get comprehensive loan analytics for the current user."""
     try:
+        loan_service = LoanService(db)
         analytics = await loan_service.get_loan_analytics(current_user.id)
         return analytics
     except Exception as e:
@@ -311,10 +275,11 @@ async def get_monthly_loan_summary(
     year: int = Query(..., description="Year (e.g., 2024)"),
     month: int = Query(..., ge=1, le=12, description="Month (1-12)"),
     current_user: User = Depends(get_current_user),
-    loan_service: LoanService = Depends(get_loan_service)
+    db: AsyncSession = Depends(get_data_db)
 ):
     """Get loan summary for a specific month."""
     try:
+        loan_service = LoanService(db)
         summary = await loan_service.get_monthly_loan_summary(current_user.id, year, month)
         return summary
     except Exception as e:
@@ -329,10 +294,11 @@ async def get_monthly_loan_summary(
 async def calculate_emi_impact(
     calculation_request: EMICalculationRequest,
     current_user: User = Depends(get_current_user),
-    loan_service: LoanService = Depends(get_loan_service)
+    db: AsyncSession = Depends(get_data_db)
 ):
     """Calculate the impact of EMI changes on loan tenure and interest savings."""
     try:
+        loan_service = LoanService(db)
         impact_analysis = await loan_service.calculate_emi_impact(calculation_request)
         return impact_analysis
     except Exception as e:
@@ -347,10 +313,11 @@ async def analyze_prepayment(
     loan_id: UUID,
     prepayment_request: PrepaymentAnalysisRequest,
     current_user: User = Depends(get_current_user),
-    loan_service: LoanService = Depends(get_loan_service)
+    db: AsyncSession = Depends(get_data_db)
 ):
     """Analyze the impact of prepayment on loan tenure and interest savings."""
     try:
+        loan_service = LoanService(db)
         analysis = await loan_service.analyze_prepayment(
             current_user.id, 
             loan_id, 
@@ -373,10 +340,11 @@ async def analyze_prepayment(
 async def configure_loan(
     loan_config: LoanConfiguration,
     current_user: User = Depends(get_current_user),
-    loan_service: LoanService = Depends(get_loan_service)
+    db: AsyncSession = Depends(get_data_db)
 ):
     """Configure loan parameters (principal, interest rate, EMI, prepayment)."""
     try:
+        loan_service = LoanService(db)
         configured_loan = await loan_service.configure_loan(current_user.id, loan_config)
         
         if not configured_loan:
@@ -398,10 +366,11 @@ async def configure_loan(
 @router.get("/analytics/comprehensive", response_model=ComprehensiveLoanAnalysis)
 async def get_comprehensive_loan_analysis(
     current_user: User = Depends(get_current_user),
-    loan_service: LoanService = Depends(get_loan_service)
+    db: AsyncSession = Depends(get_data_db)
 ):
     """Get comprehensive loan analysis with optimization suggestions and budget integration."""
     try:
+        loan_service = LoanService(db)
         analysis = await loan_service.get_comprehensive_loan_analysis(current_user.id)
         return analysis
     except Exception as e:
@@ -415,10 +384,11 @@ async def get_comprehensive_loan_analysis(
 async def calculate_emi(
     calculation_request: EMICalculationRequest,
     current_user: User = Depends(get_current_user),
-    loan_service: LoanService = Depends(get_loan_service)
+    db: AsyncSession = Depends(get_data_db)
 ):
     """Calculate EMI for given loan parameters."""
     try:
+        loan_service = LoanService(db)
         emi_amount = loan_service._calculate_emi(
             calculation_request.principal_amount,
             calculation_request.interest_rate,
@@ -448,10 +418,11 @@ async def calculate_emi(
 async def compare_loans(
     comparison_request: LoanComparisonRequest,
     current_user: User = Depends(get_current_user),
-    loan_service: LoanService = Depends(get_loan_service)
+    db: AsyncSession = Depends(get_data_db)
 ):
     """Compare multiple loan options."""
     try:
+        loan_service = LoanService(db)
         comparison_results = []
         
         for loan_option in comparison_request.loan_options:
@@ -496,10 +467,12 @@ async def compare_loans(
 async def analyze_prepayment(
     prepayment_request: PrepaymentAnalysisRequest,
     current_user: User = Depends(get_current_user),
-    loan_service: LoanService = Depends(get_loan_service)
+    db: AsyncSession = Depends(get_data_db)
 ):
     """Analyze the impact of prepayment on a loan."""
     try:
+        loan_service = LoanService(db)
+        
         # Calculate original EMI
         original_emi = loan_service._calculate_emi(
             prepayment_request.principal_amount,

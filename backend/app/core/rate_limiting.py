@@ -17,10 +17,6 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Dict, Optional, Tuple
 
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request
-from starlette.responses import Response
-
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -231,98 +227,3 @@ class RateLimitConfig:
 
 # Singleton configuration instance — created once, reads from settings at import time
 rate_limit_config = RateLimitConfig()
-
-
-# ---------------------------------------------------------------------------
-# Request identifier extraction
-# ---------------------------------------------------------------------------
-
-
-def _extract_client_ip(request: Request) -> str:
-    """Extract client IP address from the request."""
-    ip = request.headers.get("x-real-ip") or request.headers.get("x-forwarded-for")
-    if ip:
-        return ip.split(",")[0].strip()
-    return request.client.host
-
-
-class RateLimitMiddleware(BaseHTTPMiddleware):
-    """Middleware to apply rate limiting to requests."""
-
-    def __init__(self, app, rate_limiter: RateLimiter):
-        super().__init__(app)
-        self.rate_limiter = rate_limiter
-
-    async def dispatch(self, request: Request, call_next):
-        # Extract identifier from request
-        identifier, is_authenticated = self._get_identifier(request)
-
-        # Lookup rate limit rule for the request path
-        rule = rate_limit_config.get_rule(request.path, is_authenticated)
-
-        # Check and increment the request count
-        allowed, current_count = await self.rate_limiter.check_and_increment(
-            identifier, rule.limit, rule.window
-        )
-
-        if not allowed:
-            return Response(
-                content='{"detail":"Too many requests"}',
-                status_code=429,
-                media_type="application/json",
-                headers={
-                    "X-RateLimit-Limit": str(rule.limit),
-                    "X-RateLimit-Remaining": "0",
-                    "X-RateLimit-Reset": str(int(time.time() + rule.window)),
-                    "Retry-After": str(rule.window),
-                },
-            )
-
-        response = await call_next(request)
-        response.headers["X-RateLimit-Limit"] = str(rule.limit)
-        response.headers["X-RateLimit-Remaining"] = str(max(0, rule.limit - current_count))
-        response.headers["X-RateLimit-Reset"] = str(int(time.time() + rule.window))
-        return response
-
-    @staticmethod
-    def _get_identifier(request: Request) -> tuple[str, bool]:
-        """
-        Derive the rate-limit identifier from the request.
-
-        Returns:
-            (identifier_string, is_authenticated)
-
-        For authenticated requests the JWT `sub` claim is extracted without
-        full signature validation — full validation happens in the route.
-        """
-        auth_header = request.headers.get("Authorization", "")
-        if auth_header.startswith("Bearer "):
-            token = auth_header[len("Bearer ") :]
-            try:
-                import base64, json as _json
-                # Decode payload segment (index 1) without verification
-                payload_b64 = token.split(".")[1]
-                # Pad base64 string to a multiple of 4
-                padding = 4 - len(payload_b64) % 4
-                padded = payload_b64 + "=" * (padding % 4)
-                payload = _json.loads(base64.urlsafe_b64decode(padded))
-                sub = payload.get("sub")
-                if sub:
-                    return f"user:{sub}", True
-            except Exception:
-                pass  # Fall through to IP-based
-
-        # Unauthenticated — use client IP + device fingerprint to reduce collisions
-        ip = _extract_client_ip(request)
-        # Prefer an explicit client fingerprint header when provided
-        fingerprint = request.headers.get("x-device-fingerprint")
-        if not fingerprint:
-            # Derive a short fingerprint from User-Agent + IP to better distinguish clients behind NAT
-            try:
-                import hashlib
-                ua = request.headers.get("user-agent", "")[:512]
-                fp_source = f"{ip}:{ua}"
-                fingerprint = hashlib.sha256(fp_source.encode("utf-8")).hexdigest()[:12]
-            except Exception:
-                fingerprint = "unknown"
-        return f"ip:{ip}:fp:{fingerprint}", False
