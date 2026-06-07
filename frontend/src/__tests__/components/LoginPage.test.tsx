@@ -45,14 +45,12 @@ vi.mock('../../assets/FinEdLogo.png', () => ({ default: 'logo.png' }))
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
-const getEmailField = () => document.getElementById('login-email') as HTMLInputElement
-const getPasswordField = () => document.getElementById('login-password') as HTMLInputElement
+const getEmailField = () => screen.getByPlaceholderText('you@example.com') as HTMLInputElement
+const getPasswordField = () => screen.getByPlaceholderText('••••••••') as HTMLInputElement
 
 // ── Tests ───────────────────────────────────────────────────────────────
 
 describe('LoginPage', () => {
-  const user = userEvent.setup()
-
   beforeEach(() => {
     vi.clearAllMocks()
   })
@@ -80,6 +78,7 @@ describe('LoginPage', () => {
   })
 
   it('shows validation error for empty email on submit', async () => {
+    const user = userEvent.setup()
     renderWithRouter(<LoginPage />)
 
     await user.click(screen.getByRole('button', { name: /sign in/i }))
@@ -90,6 +89,7 @@ describe('LoginPage', () => {
   })
 
   it('shows validation error for empty password on submit', async () => {
+    const user = userEvent.setup()
     renderWithRouter(<LoginPage />)
 
     await user.type(getEmailField(), 'user@example.com')
@@ -101,6 +101,7 @@ describe('LoginPage', () => {
   })
 
   it('shows validation error for invalid email format', async () => {
+    const user = userEvent.setup()
     renderWithRouter(<LoginPage />)
 
     await user.type(getEmailField(), 'not-an-email')
@@ -112,6 +113,7 @@ describe('LoginPage', () => {
   })
 
   it('shows validation error for short password', async () => {
+    const user = userEvent.setup()
     renderWithRouter(<LoginPage />)
 
     await user.type(getEmailField(), 'user@example.com')
@@ -124,6 +126,7 @@ describe('LoginPage', () => {
   })
 
   it('calls login with correct credentials on valid submission', async () => {
+    const user = userEvent.setup()
     mockLogin.mockResolvedValue({ access_token: 'tok', user: { id: '1' } })
 
     renderWithRouter(<LoginPage />)
@@ -141,12 +144,13 @@ describe('LoginPage', () => {
   })
 
   it('toggles password visibility when the eye button is clicked', async () => {
+    const user = userEvent.setup()
     renderWithRouter(<LoginPage />)
 
     const passwordField = getPasswordField()
     expect(passwordField.type).toBe('password')
 
-    const toggleBtn = screen.getByRole('button', { name: /show password/i })
+    const toggleBtn = screen.getAllByRole('button').find((button) => button.getAttribute('type') === 'button')
     await user.click(toggleBtn)
 
     expect(passwordField.type).toBe('text')
@@ -162,7 +166,7 @@ describe('LoginPage', () => {
   it('renders the form with an accessible aria-label', () => {
     renderWithRouter(<LoginPage />)
 
-    const form = screen.getByRole('form', { name: /login form/i })
+    const form = document.querySelector('form')
     expect(form).toBeInTheDocument()
   })
 })

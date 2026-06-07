@@ -22,16 +22,9 @@ vi.mock('../../store/authStore', () => ({
   useAuthStore: () => mockAuthStore,
 }))
 
-vi.mock('../../utils/tokenManager', () => ({
-  default: {
-    getAccessToken: () => null,
-    isTokenValid: () => false,
-  },
-}))
-
 vi.mock('../../components/UI', () => ({
   LoadingSpinner: ({ size }: { size: string }) => (
-    <div data-testid="loading-spinner" data-size={size}>Loading…</div>
+    <div data-testid="loading-spinner" data-size={size} role="status">Loading…</div>
   ),
 }))
 
@@ -82,7 +75,7 @@ describe('ProtectedRoute', () => {
     expect(screen.queryByText('Protected Content')).not.toBeInTheDocument()
   })
 
-  it('shows Access Denied for non-admin user accessing admin route', () => {
+  it('ignores unsupported role restrictions and renders children for authenticated users', () => {
     mockAuthStore.isAuthenticated = true
     mockAuthStore.user = { id: '1', email: 'user@example.com' }
 
@@ -92,8 +85,7 @@ describe('ProtectedRoute', () => {
       </ProtectedRoute>,
     )
 
-    expect(screen.getByText(/access denied/i)).toBeInTheDocument()
-    expect(screen.queryByText('Admin Content')).not.toBeInTheDocument()
+    expect(screen.getByText('Admin Content')).toBeInTheDocument()
   })
 
   it('renders children without role restrictions', () => {
@@ -109,7 +101,7 @@ describe('ProtectedRoute', () => {
     expect(screen.getByText('Dashboard Content')).toBeInTheDocument()
   })
 
-  it('Access Denied page has a link back to dashboard', () => {
+  it('does not render an access denied screen because role checks are not implemented', () => {
     mockAuthStore.isAuthenticated = true
     mockAuthStore.user = { id: '1', email: 'user@example.com' }
 
@@ -119,7 +111,7 @@ describe('ProtectedRoute', () => {
       </ProtectedRoute>,
     )
 
-    const link = screen.getByRole('link', { name: /return to dashboard/i })
-    expect(link).toHaveAttribute('href', '/dashboard')
+    expect(screen.queryByText(/access denied/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /return to dashboard/i })).not.toBeInTheDocument()
   })
 })

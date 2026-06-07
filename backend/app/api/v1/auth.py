@@ -4,16 +4,14 @@ from pydantic import BaseModel, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_auth_db, get_data_db
-from app.schemas.auth import UserRegister, UserLogin, Token, TokenResponse, UserResponse, PasswordChange
+from app.schemas.auth import UserRegister, UserLogin, TokenResponse, UserResponse, PasswordChange
 from app.schemas.user_profile import UserProfileUpdate, UserProfileResponse
 from app.schemas.financial_profile import FinancialProfileUpdate, FinancialProfileResponse
 from app.services.auth_service import AuthService
-from app.services.user_service import UserService
 from app.services.verification_token_service import VerificationTokenService
 from app.repositories.user_repository import UserRepository
 from app.repositories.refresh_token_repository import RefreshTokenRepository
-from app.repositories.user_profile_repository import UserProfileRepository
-from app.core.exceptions import UserAlreadyExistsError, DatabaseError, AuthenticationError
+from app.core.exceptions import UserAlreadyExistsError, AuthenticationError
 from app.core.logging import get_logger
 from app.core.provider_implementations import BcryptPasswordHasher, JWTTokenProvider
 from app.config import settings
@@ -146,23 +144,23 @@ async def register(
     }
     ```
     """
-    logger.info(f"User registration attempt", email=user_data.email)
+    logger.info("User registration attempt", email=user_data.email)
 
     # Create user in auth database
     try:
         user = await auth_service.register_user(user_data)
-        logger.info(f"User registered successfully", user_id=str(user.id), email=user_data.email)
+        logger.info("User registered successfully", user_id=str(user.id), email=user_data.email)
         
         # Create user profile in data database
         from app.repositories.user_profile_repository import UserProfileRepository
         profile_repo = UserProfileRepository(data_db)
         await profile_repo.create_profile(user.id)
-        logger.info(f"User profile created", user_id=str(user.id))
+        logger.info("User profile created", user_id=str(user.id))
     except UserAlreadyExistsError as e:
-        logger.warning(f"Registration failed: user already exists", email=user_data.email)
+        logger.warning("Registration failed: user already exists", email=user_data.email)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        logger.error(f"User registration failed", email=user_data.email, exc_info=True)
+        logger.error("User registration failed", email=user_data.email, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to register user",

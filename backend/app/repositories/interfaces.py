@@ -11,6 +11,7 @@ from app.schemas.auth import UserCreate
 from app.schemas.user_profile import UserProfileCreate, UserProfileUpdate
 from app.schemas.budget import BudgetCreate, BudgetUpdate
 from app.schemas.expense import ExpenseCreate, ExpenseUpdate
+from app.schemas.loan import LoanCreate, LoanUpdate, LoanPaymentCreate
 
 
 class IUserRepository(ABC):
@@ -121,4 +122,61 @@ class IExpenseRepository(ABC):
     @abstractmethod
     async def delete_expense(self, expense_id: UUID) -> bool:
         """Delete an expense."""
+        pass
+
+
+class ILoanRepository(ABC):
+    """Interface for loan repository operations."""
+
+    @abstractmethod
+    async def create_loan(self, user_id: UUID, loan_data: LoanCreate) -> Loan:
+        """Create a loan for a user."""
+        pass
+
+    @abstractmethod
+    async def get_loan_by_id(self, loan_id: UUID, user_id: UUID) -> Optional[Loan]:
+        """Get a loan by ID for a specific user."""
+        pass
+
+    @abstractmethod
+    async def get_loans_by_user(self, user_id: UUID, status: Optional[str] = None) -> List[Loan]:
+        """Get loans for a user, optionally filtered by status."""
+        pass
+
+    @abstractmethod
+    async def update_loan(self, loan_id: UUID, user_id: UUID, loan_data: LoanUpdate) -> Optional[Loan]:
+        """Update a user's loan."""
+        pass
+
+    @abstractmethod
+    async def delete_loan(self, loan_id: UUID, user_id: UUID) -> bool:
+        """Delete a user's loan."""
+        pass
+
+    @abstractmethod
+    async def get_loan_payments(self, loan_id: UUID) -> List[Any]:
+        """Get payment history for a loan."""
+        pass
+
+    @abstractmethod
+    async def create_payment(
+        self,
+        loan_id: UUID,
+        user_id: UUID,
+        payment_data: LoanPaymentCreate,
+        principal_amount: float,
+        interest_amount: float,
+        outstanding_balance: float,
+    ) -> Any:
+        """Create a payment against a loan."""
+        pass
+
+    @abstractmethod
+    async def get_loans_due_soon(self, days_ahead: int = 7) -> List[Loan]:
+        """Get loans with due dates approaching soon."""
+        pass
+
+    @abstractmethod
+    async def get_overdue_loans(self) -> List[Loan]:
+        """Get overdue loans."""
         pass

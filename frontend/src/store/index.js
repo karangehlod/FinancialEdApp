@@ -6,7 +6,7 @@ import {
   goalService,
   notificationService,
   authService,
-} from '../services/apiService'
+} from '../services/apiService.js'
 
 // Profile Store - For user profile and financial profile
 export const useProfileStore = create((set) => ({

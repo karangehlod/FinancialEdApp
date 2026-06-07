@@ -8,7 +8,9 @@ from sqlalchemy import func, and_, desc, select
 
 from app.db.models.data import Loan, LoanPayment
 from app.schemas.loan import (
-    LoanCreate, LoanUpdate, LoanResponse, LoanPaymentCreate, 
+    EMICalculationRequest,
+    EMIImpactAnalysis,
+    LoanCreate, LoanUpdate, LoanResponse, LoanPaymentCreate,
     LoanPaymentResponse, LoanAnalytics, RepaymentScheduleItem,
     LoanSummary, MonthlyLoanSummary, LoanStatus, PaymentStatus
 )
@@ -571,10 +573,9 @@ class LoanService:
 
     # ============= Advanced Loan Calculations =============
     
-    async def calculate_emi_impact(self, calculation_request: 'EMICalculationRequest') -> 'EMIImpactAnalysis':
+    async def calculate_emi_impact(self, calculation_request: EMICalculationRequest) -> EMIImpactAnalysis:
         """Calculate the impact of EMI changes on loan tenure and interest."""
-        from app.schemas.loan import EMIImpactAnalysis
-        
+
         # Use PrepaymentCalculator for analysis
         impact = PrepaymentCalculator.calculate_emi_change_impact(
             calculation_request.principal_amount,

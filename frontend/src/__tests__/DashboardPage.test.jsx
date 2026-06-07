@@ -3,7 +3,14 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
 import { DashboardPage } from '../pages/DashboardPage'
 import { useAuthStore } from '../store/authStore'
-import { useExpenseStore, useBudgetStore, useGoalStore, useLoanStore } from '../store/index'
+import {
+  useExpenseStore,
+  useBudgetStore,
+  useGoalStore,
+  useLoanStore,
+  useNotificationStore,
+  useProfileStore,
+} from '../store/index'
 
 // Mock all the stores
 vi.mock('../store/authStore', () => ({
@@ -17,6 +24,13 @@ vi.mock('../store/index', () => ({
   useLoanStore: vi.fn(),
   useNotificationStore: vi.fn(),
   useProfileStore: vi.fn(),
+}))
+
+vi.mock('../store/themeStore', () => ({
+  useThemeStore: () => ({
+    theme: 'light',
+    toggleTheme: vi.fn(),
+  }),
 }))
 
 // Mock api services used by stores to avoid runtime imports
@@ -98,12 +112,8 @@ describe('DashboardPage', () => {
     useBudgetStore.mockReturnValue(defaultBudgetStore)
     useGoalStore.mockReturnValue(defaultGoalStore)
     useLoanStore.mockReturnValue(defaultLoanStore)
-    // Provide minimal notification/profile store to satisfy layout/Header usage
-    const notif = { notifications: [], markNotificationAsRead: vi.fn() }
-    const prof = { profile: { name: 'John Doe' } }
-    const { useNotificationStore, useProfileStore } = require('../store/index')
-    useNotificationStore.mockReturnValue(notif)
-    useProfileStore.mockReturnValue(prof)
+    useNotificationStore.mockReturnValue({ notifications: [], markNotificationAsRead: vi.fn() })
+    useProfileStore.mockReturnValue({ profile: { name: 'John Doe' } })
   })
 
   const renderDashboardPage = () => {
@@ -121,35 +131,17 @@ describe('DashboardPage', () => {
     expect(screen.getByText(/manage your finances with detailed insights/i)).toBeInTheDocument()
   })
 
-  it('renders all navigation tabs', () => {
+  it('renders dashboard actions and overview content', () => {
     renderDashboardPage()
 
-    expect(screen.getByText('Overview')).toBeInTheDocument()
-    expect(screen.getByText('Expenses')).toBeInTheDocument()
-    expect(screen.getByText('Budgets')).toBeInTheDocument()
-    expect(screen.getByText('Goals')).toBeInTheDocument()
-    expect(screen.getByText('Loans')).toBeInTheDocument()
-    expect(screen.getByText('Chat')).toBeInTheDocument()
-    expect(screen.getByText('Reports')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /add expense/i })).toBeInTheDocument()
+    expect(screen.getByTitle(/view reports and export data/i)).toBeInTheDocument()
   })
 
-  it('displays overview tab by default', () => {
+  it('displays overview content by default', () => {
     renderDashboardPage()
 
-    // Overview tab should be active by default
-    const overviewTab = screen.getByText('Overview').closest('button')
-    expect(overviewTab).toHaveClass('border-blue-600', 'text-blue-600')
-  })
-
-  it('switches tabs when clicked', async () => {
-    renderDashboardPage()
-
-    const expensesTab = screen.getByText('Expenses').closest('button')
-    fireEvent.click(expensesTab)
-
-    await waitFor(() => {
-      expect(expensesTab).toHaveClass('border-blue-600', 'text-blue-600')
-    })
+    expect(screen.getByText(/welcome back, john doe/i)).toBeInTheDocument()
   })
 
   it('fetches all data on mount', () => {
@@ -169,7 +161,7 @@ describe('DashboardPage', () => {
 
     renderDashboardPage()
 
-    expect(screen.getByRole('status')).toBeInTheDocument()
+    expect(document.querySelector('.border-4.border-primary-200')).not.toBeNull()
   })
 
   it('has Add Expense button that navigates to expenses page', () => {
@@ -181,83 +173,12 @@ describe('DashboardPage', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/expenses')
   })
 
-  it('has Export button that switches to reports tab', () => {
+  it('has Reports button that navigates to reports page', () => {
     renderDashboardPage()
 
-    const exportButton = screen.getByRole('button', { name: /export/i })
+    const exportButton = screen.getByTitle(/view reports and export data/i)
     fireEvent.click(exportButton)
 
-    // Should switch to reports tab
-    const reportsTab = screen.getByText('Reports').closest('button')
-    expect(reportsTab).toHaveClass('border-blue-600', 'text-blue-600')
-  })
-
-  describe('Tab Content', () => {
-    it('shows expenses tab content when expenses tab is active', async () => {
-      renderDashboardPage()
-
-      const expensesTab = screen.getByText('Expenses')
-      fireEvent.click(expensesTab)
-
-      await waitFor(() => {
-        // ExpensesTab component should receive expenses data
-        expect(screen.getByText('Expenses')).toBeInTheDocument()
-      })
-    })
-
-    it('shows budgets tab content when budgets tab is active', async () => {
-      renderDashboardPage()
-
-      const budgetsTab = screen.getByText('Budgets')
-      fireEvent.click(budgetsTab)
-
-      await waitFor(() => {
-        expect(screen.getByText('Budgets')).toBeInTheDocument()
-      })
-    })
-
-    it('shows goals tab content when goals tab is active', async () => {
-      renderDashboardPage()
-
-      const goalsTab = screen.getByText('Goals')
-      fireEvent.click(goalsTab)
-
-      await waitFor(() => {
-        expect(screen.getByText('Goals')).toBeInTheDocument()
-      })
-    })
-
-    it('shows loans tab content when loans tab is active', async () => {
-      renderDashboardPage()
-
-      const loansTab = screen.getByText('Loans')
-      fireEvent.click(loansTab)
-
-      await waitFor(() => {
-        expect(screen.getByText('Loans')).toBeInTheDocument()
-      })
-    })
-
-    it('shows chat tab content when chat tab is active', async () => {
-      renderDashboardPage()
-
-      const chatTab = screen.getByText('Chat')
-      fireEvent.click(chatTab)
-
-      await waitFor(() => {
-        expect(screen.getByText('Chat')).toBeInTheDocument()
-      })
-    })
-
-    it('shows reports tab content when reports tab is active', async () => {
-      renderDashboardPage()
-
-      const reportsTab = screen.getByText('Reports')
-      fireEvent.click(reportsTab)
-
-      await waitFor(() => {
-        expect(screen.getByText('Reports')).toBeInTheDocument()
-      })
-    })
+    expect(mockNavigate).toHaveBeenCalledWith('/reports')
   })
 })

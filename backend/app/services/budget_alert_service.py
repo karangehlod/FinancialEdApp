@@ -250,7 +250,7 @@ class BudgetAlertService:
             select(BudgetAlert).where(
                 and_(
                     BudgetAlert.user_id == uuid.UUID(user_id),
-                    BudgetAlert.is_read == False,
+                    ~BudgetAlert.is_read,
                 )
             )
         )

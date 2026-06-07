@@ -3,6 +3,21 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql import func
 from app.db.session import DataBase
 import uuid
+from datetime import datetime, timezone
+
+
+class SoftDeleteMixin:
+    is_deleted = Column(Boolean, default=False, nullable=False)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+
+    def soft_delete(self) -> None:
+        if not getattr(self, 'is_deleted', False):
+            self.is_deleted = True
+            self.deleted_at = datetime.now(timezone.utc)
+
+    def restore(self) -> None:
+        self.is_deleted = False
+        self.deleted_at = None
 
 
 class UserProfile(DataBase):
@@ -22,7 +37,7 @@ class UserProfile(DataBase):
     updated_at = Column(DateTime(timezone=False), server_default=func.now(), onupdate=func.now())
 
 
-class Expense(DataBase):
+class Expense(SoftDeleteMixin, DataBase):
     __tablename__ = "expenses"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -38,7 +53,7 @@ class Expense(DataBase):
     created_at = Column(DateTime(timezone=False), server_default=func.now())
 
 
-class Budget(DataBase):
+class Budget(SoftDeleteMixin, DataBase):
     __tablename__ = "budgets"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -116,7 +131,7 @@ class LoanPayment(DataBase):
     created_at = Column(DateTime(timezone=False), server_default=func.now())
 
 
-class Goal(DataBase):
+class Goal(SoftDeleteMixin, DataBase):
     __tablename__ = "goals"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -133,7 +148,7 @@ class Goal(DataBase):
     updated_at = Column(DateTime(timezone=False), server_default=func.now(), onupdate=func.now())
 
 
-class RecurringExpense(DataBase):
+class RecurringExpense(SoftDeleteMixin, DataBase):
     __tablename__ = "recurring_expenses"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

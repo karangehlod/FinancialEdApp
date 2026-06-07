@@ -24,6 +24,7 @@ from app.db.models.data import Loan, LoanPayment
 from app.repositories.interfaces import ILoanRepository
 from app.repositories.loan_repository import LoanRepository
 from app.schemas.loan import (
+    EMIImpactAnalysis,
     LoanAnalytics,
     LoanResponse,
     LoanStatus,
@@ -331,10 +332,8 @@ class LoanAnalyticsService(BaseService):
     # Advanced calculations
     # ------------------------------------------------------------------
 
-    async def calculate_emi_impact(self, calculation_request) -> "EMIImpactAnalysis":
+    async def calculate_emi_impact(self, calculation_request) -> EMIImpactAnalysis:
         """Calculate the impact of changing EMI amount."""
-        from app.schemas.loan import EMIImpactAnalysis
-
         impact = PrepaymentCalculator.calculate_emi_change_impact(
             calculation_request.principal_amount,
             calculation_request.interest_rate,

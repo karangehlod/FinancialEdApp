@@ -277,7 +277,7 @@ class ExpenseService:
                         and_(
                             BudgetAlert.budget_id == budget.id,
                             BudgetAlert.alert_level == "HIGH",
-                            BudgetAlert.is_read == False,  # noqa: E712
+                            ~BudgetAlert.is_read,
                         )
                     )
                 )

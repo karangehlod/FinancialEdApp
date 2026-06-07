@@ -11,6 +11,11 @@ export default defineConfig({
     react(),
     ...(visualizer ? [visualizer({ open: true, gzipSize: true, brotliSize: true, filename: 'dist/stats.html' })] : []),
   ],
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: './src/testSetup.js',
+  },
   server: {
     port: 3000,
     proxy: {

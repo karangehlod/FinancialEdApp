@@ -172,6 +172,30 @@ class CacheService:
             logger.debug("Cache invalidated %d keys for pattern '%s'", count, pattern)
         return count
 
+    async def bump_version(self, namespace: str, user_id: str) -> bool:
+        """Increment a lightweight version counter used for ETag invalidation."""
+        if not self._enabled or not getattr(self._cache, "redis", None):
+            return False
+
+        version_key = f"cache_version:{namespace}:{user_id}"
+        await self._cache.redis.incr(version_key)
+        return True
+
+    async def get_version(self, namespace: str, user_id: str) -> int:
+        """Return the current version counter for a namespace/user pair."""
+        if not self._enabled or not getattr(self._cache, "redis", None):
+            return 0
+
+        version_key = f"cache_version:{namespace}:{user_id}"
+        value = await self._cache.redis.get(version_key)
+        if value is None:
+            return 0
+
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return 0
+
     # ------------------------------------------------------------------
     # Cache-aside helper
     # ------------------------------------------------------------------

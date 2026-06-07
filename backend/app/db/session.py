@@ -173,3 +173,24 @@ async def dispose_engines() -> None:
     await auth_engine.dispose()
     await data_engine.dispose()
     logger.info("Database connection pools disposed.")
+
+
+def get_pool_strategy_summary() -> dict:
+    """Return a lightweight summary of the configured pool strategy for each engine."""
+    def summarize(engine) -> dict:
+        pool = getattr(getattr(engine, "sync_engine", None), "pool", None)
+        pool_class = getattr(getattr(pool, "__class__", None), "__name__", "unknown") if pool else "unknown"
+        return {
+            "pgbouncer_mode": _PGBOUNCER_MODE,
+            "pool_class": pool_class,
+            "pool_pre_ping": _POOL_CONFIG.get("pool_pre_ping"),
+            "pool_size": _POOL_CONFIG.get("pool_size"),
+            "max_overflow": _POOL_CONFIG.get("max_overflow"),
+            "pool_timeout": _POOL_CONFIG.get("pool_timeout"),
+            "pool_recycle": _POOL_CONFIG.get("pool_recycle"),
+        }
+
+    return {
+        "auth_db": summarize(auth_engine),
+        "data_db": summarize(data_engine),
+    }
