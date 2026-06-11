@@ -152,6 +152,8 @@ jobs:
       APP_NAME: "FinancialEdApp-Test"
       APP_VERSION: "0.0.0"
       DEBUG: "false"
+      # "testing" is rejected by pydantic validator — allowed values are
+      # development | staging | production only.
       ENVIRONMENT: "development"
       TESTING: "true"
       ALLOWED_ORIGINS: "http://localhost:5173"
@@ -233,10 +235,17 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
+        # eslint-plugin-react-hooks is not in package.json yet —
+        # install it alongside so the .eslintrc.cjs plugin:react-hooks/recommended
+        # extend resolves. Add it to devDependencies and remove --no-save once committed.
+        run: |
+          npm install --legacy-peer-deps
+          npm install --no-save --legacy-peer-deps eslint-plugin-react-hooks
 
       - name: Run ESLint
-        run: npx eslint src/ --ext .js,.jsx,.ts,.tsx --max-warnings 0 || true
+        # No || true — the updated .eslintrc.cjs fixes all exit-1 errors.
+        # Remaining no-unused-vars issues are downgraded to warn and won't fail.
+        run: npx eslint src/ --ext .js,.jsx,.ts,.tsx
 
       - name: TypeScript type check
         run: npx tsc --noEmit || true
