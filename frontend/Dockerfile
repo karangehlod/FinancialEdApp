@@ -18,7 +18,7 @@ ENV VITE_ADMIN_EMAILS=$VITE_ADMIN_EMAILS
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
 # Copy source code
 COPY . .
