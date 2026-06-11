@@ -188,7 +188,7 @@ class RefreshTokenRepository:
             select(RefreshToken).where(
                 and_(
                     RefreshToken.token_hash == token_hash,
-                    RefreshToken.is_revoked == False,  # noqa: E712
+                    ~RefreshToken.is_revoked,
                     RefreshToken.expires_at > now,
                 )
             )
@@ -201,7 +201,7 @@ class RefreshTokenRepository:
             select(RefreshToken).where(
                 and_(
                     RefreshToken.user_id == user_id,
-                    RefreshToken.is_revoked == False,  # noqa: E712
+                    ~RefreshToken.is_revoked,
                 )
             )
         )

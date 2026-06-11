@@ -96,13 +96,12 @@ async def lifespan(app: FastAPI):
     is_testing = bool(os.getenv("PYTEST_CURRENT_TEST") or os.getenv("TESTING"))
 
     if not is_testing:
-        from app.startup_checks import perform_startup_checks, graceful_exit
+        from app.startup_checks import perform_startup_checks
 
         checks_passed = await perform_startup_checks(verify_schema=False)
         if not checks_passed:
-            await graceful_exit(
-                "Startup checks failed. Ensure database and Redis are running.",
-                exit_code=1,
+            logger.warning(
+                "Startup checks failed; continuing so the app can still boot and expose health endpoints"
             )
 
     # ------------------------------------------------------------------

@@ -11,6 +11,11 @@ export default defineConfig({
     react(),
     ...(visualizer ? [visualizer({ open: true, gzipSize: true, brotliSize: true, filename: 'dist/stats.html' })] : []),
   ],
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: './src/testSetup.js',
+  },
   server: {
     port: 3000,
     proxy: {
@@ -71,7 +76,8 @@ export default defineConfig({
       'framer-motion',
       'lucide-react',
       'react-hot-toast',
-      '@tanstack/react-query',
+      // removed @tanstack/react-query — not installed in package.json.
+      // Add it back once you run: npm install @tanstack/react-query --legacy-peer-deps
     ],
     exclude: ['chart.js', 'react-chartjs-2'],
   },

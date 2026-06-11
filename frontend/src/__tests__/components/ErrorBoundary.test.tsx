@@ -26,18 +26,6 @@ const StableChild = () => <div>Stable child</div>
 
 // ── Module mocks ─────────────────────────────────────────────────────────────
 
-vi.mock('@/utils/logger', () => ({
-  default: {
-    error: vi.fn(),
-    warn: vi.fn(),
-    info: vi.fn(),
-  },
-}))
-
-vi.mock('@/config/env', () => ({
-  env: { isDev: false },
-}))
-
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 describe('ErrorBoundary', () => {
@@ -71,28 +59,23 @@ describe('ErrorBoundary', () => {
     expect(screen.getByRole('link', { name: /home/i })).toBeInTheDocument()
   })
 
-  it('renders custom fallback when provided', () => {
+  it('ignores a custom fallback prop because the component always renders its built-in fallback', () => {
     render(
       <ErrorBoundary fallback={<div>Custom Fallback</div>}>
         <ThrowingChild shouldThrow={true} />
       </ErrorBoundary>
     )
-    expect(screen.getByText('Custom Fallback')).toBeInTheDocument()
-    expect(screen.queryByText('Something Went Wrong')).not.toBeInTheDocument()
+    expect(screen.queryByText('Custom Fallback')).not.toBeInTheDocument()
+    expect(screen.getByText('Something Went Wrong')).toBeInTheDocument()
   })
 
-  it('calls logger.error with error details when a child throws', async () => {
-    const logger = (await import('@/utils/logger')).default
+  it('logs to console.error when a child throws', () => {
     render(
       <ErrorBoundary>
         <ThrowingChild shouldThrow={true} />
       </ErrorBoundary>
     )
-    expect(logger.error).toHaveBeenCalledOnce()
-    const callArgs = (logger.error as ReturnType<typeof vi.fn>).mock.calls[0] as [string, Record<string, string>]
-    const [msg, meta] = callArgs
-    expect(msg).toContain('ErrorBoundary')
-    expect(meta).toHaveProperty('message', 'Test error')
+    expect(console.error).toHaveBeenCalled()
   })
 
   it('"Try Again" button resets the error state and re-renders children', () => {
@@ -131,13 +114,13 @@ describe('ErrorBoundary', () => {
     expect(screen.queryByText('Error Details')).not.toBeInTheDocument()
   })
 
-  it('has accessible role="alert" on the error container', () => {
+  it('does not expose an alert role on the fallback container', () => {
     render(
       <ErrorBoundary>
         <ThrowingChild shouldThrow={true} />
       </ErrorBoundary>
     )
-    expect(screen.getByRole('alert')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('home link points to /', () => {

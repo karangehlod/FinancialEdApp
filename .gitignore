@@ -35,7 +35,6 @@ coverage/
 # Ignore package manager files
 .pnpm-debug.log
 yarn-error.log
-package-lock.json
 
 # Ignore Python virtual environments and cache files
 venv/
@@ -125,7 +124,6 @@ coverage/
 # Ignore package manager files
 .pnpm-debug.log
 yarn-error.log
-package-lock.json
 
 # Ignore Python virtual environments and cache files
 venv/

@@ -185,7 +185,7 @@ class NotificationService:
             select(Notification).where(
                 and_(
                     Notification.user_id == uuid.UUID(user_id),
-                    Notification.is_read == False,
+                    ~Notification.is_read,
                 )
             )
         )
@@ -278,7 +278,7 @@ class NotificationService:
             select(Notification).where(
                 and_(
                     Notification.user_id == uuid.UUID(user_id),
-                    Notification.is_read == False,
+                    ~Notification.is_read,
                 )
             )
         )

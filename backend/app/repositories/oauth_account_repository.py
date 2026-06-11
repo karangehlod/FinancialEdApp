@@ -45,7 +45,7 @@ class OAuthAccountRepository:
             select(OAuthAccount).where(
                 OAuthAccount.provider == provider,
                 OAuthAccount.provider_user_id == provider_user_id,
-                OAuthAccount.is_active == True,  # noqa: E712
+                OAuthAccount.is_active,
             )
         )
         return result.scalars().first()
@@ -55,7 +55,7 @@ class OAuthAccountRepository:
         result = await self.db.execute(
             select(OAuthAccount).where(
                 OAuthAccount.user_id == user_id,
-                OAuthAccount.is_active == True,  # noqa: E712
+                OAuthAccount.is_active,
             ).order_by(OAuthAccount.created_at)
         )
         return list(result.scalars().all())
@@ -70,7 +70,7 @@ class OAuthAccountRepository:
             select(OAuthAccount).where(
                 OAuthAccount.user_id == user_id,
                 OAuthAccount.provider == provider,
-                OAuthAccount.is_active == True,  # noqa: E712
+                OAuthAccount.is_active,
             )
         )
         return result.scalars().first()
@@ -143,7 +143,7 @@ class OAuthAccountRepository:
             .where(
                 OAuthAccount.user_id == user_id,
                 OAuthAccount.provider == provider,
-                OAuthAccount.is_active == True,  # noqa: E712
+                OAuthAccount.is_active,
             )
             .values(
                 is_active=False,

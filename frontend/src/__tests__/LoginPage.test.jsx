@@ -4,6 +4,8 @@ import { BrowserRouter } from 'react-router-dom'
 import { LoginPage } from '../pages/LoginPage'
 import { useAuthStore } from '../store/authStore'
 
+const mockReplace = vi.fn()
+
 // Mock the auth store
 vi.mock('../store/authStore', () => ({
   useAuthStore: vi.fn(),
@@ -26,12 +28,16 @@ describe('LoginPage', () => {
     login: mockLogin,
     isLoading: false,
     error: null,
-    isAuthenticated: false,
     logout: vi.fn(),
+    clearError: vi.fn(),
   }
 
   beforeEach(() => {
     vi.clearAllMocks()
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { replace: mockReplace },
+    })
     useAuthStore.mockReturnValue(defaultAuthStore)
   })
 
@@ -46,9 +52,8 @@ describe('LoginPage', () => {
   it('renders login form with email and password fields', () => {
     renderLoginPage()
 
-    // Inputs use placeholders in the markup — use those to locate elements
     expect(screen.getByPlaceholderText(/you@example.com/i)).toBeInTheDocument()
-    expect(screen.getByPlaceholderText(/password/i)).toBeInTheDocument()
+    expect(screen.getByPlaceholderText(/••••••••/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument()
   })
 
@@ -57,7 +62,7 @@ describe('LoginPage', () => {
     renderLoginPage()
 
     const emailInput = screen.getByPlaceholderText(/you@example.com/i)
-    const passwordInput = screen.getByPlaceholderText(/password/i)
+    const passwordInput = screen.getByPlaceholderText(/••••••••/i)
     const submitButton = screen.getByRole('button', { name: /sign in/i })
 
     fireEvent.change(emailInput, { target: { value: 'test@example.com' } })
@@ -65,7 +70,7 @@ describe('LoginPage', () => {
     fireEvent.click(submitButton)
 
     await waitFor(() => {
-      expect(mockLogin).toHaveBeenCalledWith('test@example.com', 'password123')
+      expect(mockLogin).toHaveBeenCalledWith({ email: 'test@example.com', password: 'password123' })
     })
   })
 
@@ -115,7 +120,7 @@ describe('LoginPage', () => {
     fireEvent.click(submitButton)
 
     await waitFor(() => {
-      expect(screen.getByText(/please enter a valid email/i)).toBeInTheDocument()
+      expect(screen.getByText(/invalid email format/i)).toBeInTheDocument()
     })
 
     expect(mockLogin).not.toHaveBeenCalled()
@@ -123,23 +128,26 @@ describe('LoginPage', () => {
 
   it('redirects to dashboard after successful login', async () => {
     mockLogin.mockResolvedValue({ success: true })
-    useAuthStore.mockReturnValue({
-      ...defaultAuthStore,
-      isAuthenticated: true,
-    })
 
     renderLoginPage()
 
+    fireEvent.change(screen.getByPlaceholderText(/you@example.com/i), {
+      target: { value: 'test@example.com' },
+    })
+    fireEvent.change(screen.getByPlaceholderText(/••••••••/i), {
+      target: { value: 'password123' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /sign in/i }))
+
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/dashboard', { replace: true })
+      expect(mockReplace).toHaveBeenCalledWith('/dashboard')
     })
   })
 
   it('has register link that navigates to register page', () => {
     renderLoginPage()
 
-    // Some layouts render the register link as 'Create one here' or similar
-    const registerLink = screen.queryByText(/create one here/i) || screen.queryByText(/register now/i) || screen.queryByText(/create an account/i) || screen.getByRole('link', { name: /register/i })
+    const registerLink = screen.getByRole('link', { name: /create one now/i })
     expect(registerLink).toBeInTheDocument()
     expect(registerLink.closest('a')).toHaveAttribute('href', '/register')
   })

@@ -145,7 +145,7 @@ async def list_users(
     if search:
         query = query.where(UserModel.email.ilike(f"%{search}%"))
     if active_only:
-        query = query.where(UserModel.is_active == True)
+        query = query.where(UserModel.is_active)
 
     # Total count
     count_q = select(func.count()).select_from(query.subquery())

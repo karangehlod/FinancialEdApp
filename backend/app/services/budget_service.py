@@ -323,7 +323,7 @@ class BudgetService(CRUDService[Budget]):
         query = select(BudgetAlert).where(BudgetAlert.user_id == user_id)
         
         if unread_only:
-            query = query.where(BudgetAlert.is_read == False)
+            query = query.where(~BudgetAlert.is_read)
         
         query = query.order_by(desc(BudgetAlert.created_at))
         result = await self.db.execute(query)
