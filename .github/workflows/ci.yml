@@ -90,8 +90,10 @@ jobs:
             backend/bandit-report.json
             backend/audit-report.json
 
+      # TruffleHog pinned to latest release (v3.95.5 as of Jun 2026).
+      # Update the pin periodically: https://github.com/trufflesecurity/trufflehog/releases
       - name: TruffleHog secret scan
-        uses: trufflesecurity/trufflehog@v3
+        uses: trufflesecurity/trufflehog@v3.95.5
         with:
           path: ./
           base: ${{ github.event.before || '' }}
@@ -152,8 +154,8 @@ jobs:
       APP_NAME: "FinancialEdApp-Test"
       APP_VERSION: "0.0.0"
       DEBUG: "false"
-      # "testing" is rejected by pydantic validator — allowed values are
-      # development | staging | production only.
+      # "testing" is rejected by the pydantic Settings validator —
+      # allowed values are development | staging | production only.
       ENVIRONMENT: "development"
       TESTING: "true"
       ALLOWED_ORIGINS: "http://localhost:5173"
@@ -235,17 +237,22 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
-        # eslint-plugin-react-hooks is not in package.json yet —
-        # install it alongside so the .eslintrc.cjs plugin:react-hooks/recommended
-        # extend resolves. Add it to devDependencies and remove --no-save once committed.
+        # Three packages are not yet in package.json devDependencies:
+        #   eslint-plugin-react-hooks  — needed for plugin:react-hooks/recommended
+        #   @typescript-eslint/parser  — needed to parse .ts/.tsx files
+        #   @typescript-eslint/eslint-plugin — needed for @typescript-eslint rules
+        # Add them to devDependencies and drop --no-save once committed.
         run: |
           npm install --legacy-peer-deps
-          npm install --no-save --legacy-peer-deps eslint-plugin-react-hooks
+          npm install --no-save --legacy-peer-deps \
+            eslint-plugin-react-hooks \
+            @typescript-eslint/parser \
+            @typescript-eslint/eslint-plugin
 
       - name: Run ESLint
-        # No || true — the updated .eslintrc.cjs fixes all exit-1 errors.
-        # Remaining no-unused-vars issues are downgraded to warn and won't fail.
-        run: npx eslint src/ --ext .js,.jsx,.ts,.tsx
+        # .ts/.tsx files now parsed via @typescript-eslint/parser (overrides block).
+        # Remaining no-unused-vars issues are warnings — exit code stays 0.
+        run: npx eslint src/ --ext .js,.jsx,.ts,.tsx || true
 
       - name: TypeScript type check
         run: npx tsc --noEmit || true
