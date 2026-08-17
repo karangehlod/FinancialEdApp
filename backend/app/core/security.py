@@ -4,8 +4,12 @@ from typing import Optional
 import bcrypt
 from jose import JWTError, jwt
 from fastapi import HTTPException, status
+from passlib.context import CryptContext
 
 from app.config import settings
+
+# passlib context — used by tests and any code that needs CryptContext API
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=12)
 
 
 def hash_password(password: str) -> str:
@@ -51,7 +55,7 @@ def create_refresh_token(data: dict) -> str:
 
 
 def decode_token(token: str) -> dict:
-    """Decode and verify a JWT token."""
+    """Decode and verify a JWT token. Raises HTTP 401 on failure."""
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         return payload
@@ -61,3 +65,11 @@ def decode_token(token: str) -> dict:
             detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+
+def verify_token(token: str) -> Optional[dict]:
+    """Decode and verify a JWT token. Returns None on any failure (no exception)."""
+    try:
+        return jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+    except JWTError:
+        return None

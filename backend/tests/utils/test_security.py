@@ -1,10 +1,10 @@
-"""Unit tests for app.utils.security module."""
+"""Unit tests for security utilities (canonically in app.core.security)."""
 
 import pytest
 from datetime import datetime, timedelta
 from jose import JWTError
 from unittest.mock import patch, MagicMock
-from app.utils.security import (
+from app.core.security import (
     verify_password,
     get_password_hash,
     create_access_token,
@@ -59,7 +59,7 @@ class TestPasswordHashing:
         invalid_hash = "not_a_valid_hash"
         assert verify_password(password, invalid_hash) is False
 
-    @patch("app.utils.security.pwd_context.verify")
+    @patch("app.core.security.pwd_context.verify")
     def test_verify_password_exception_handling(self, mock_verify):
         mock_verify.side_effect = Exception("Hash verification error")
         result = verify_password("password", "hash")
@@ -87,7 +87,7 @@ class TestTokenCreation:
         expires_delta = timedelta(minutes=15)
         token = create_access_token(data, expires_delta)
         
-        from app.utils.security import verify_token
+        from app.core.security import verify_token
         payload = verify_token(token)
         assert payload is not None
         assert payload["sub"] == "user456"
@@ -172,7 +172,7 @@ class TestTokenVerification:
         data = {"sub": "user123"}
         token = create_access_token(data, timedelta(hours=1))
         
-        with patch("app.utils.security.settings.JWT_SECRET_KEY", "wrong_secret"):
+        with patch("app.core.security.settings.JWT_SECRET_KEY", "wrong_secret"):
             payload = verify_token(token)
             assert payload is None
 

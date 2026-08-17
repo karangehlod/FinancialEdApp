@@ -13,7 +13,7 @@ ENV VITE_API_URL=$VITE_API_URL \
     VITE_APP_VERSION=$VITE_APP_VERSION
 
 COPY package*.json ./
-RUN npm ci --legacy-peer-deps
+RUN npm install --legacy-peer-deps
 
 COPY . .
 RUN npm run build
