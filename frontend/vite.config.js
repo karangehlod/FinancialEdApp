@@ -53,26 +53,9 @@ export default defineConfig({
         pure_funcs: ['console.log', 'console.debug', 'console.info'],
       },
     },
-    rollupOptions: {
-      output: {
-        manualChunks: (id) => {
-          if (id.includes('node_modules')) {
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) {
-              return 'vendor-react';
-            }
-            if (id.includes('framer-motion') || id.includes('lucide-react') || id.includes('react-hot-toast')) {
-              return 'vendor-ui';
-            }
-            if (id.includes('recharts')) {
-              return 'vendor-charts';
-            }
-            if (id.includes('axios') || id.includes('zustand') || id.includes('date-fns')) {
-              return 'vendor-utils';
-            }
-          }
-        },
-      },
-    },
+    // manualChunks intentionally removed — Rolldown (Vite 8) has module
+    // initialisation-order issues when vendor libs are manually split.
+    // The default automatic chunking strategy is stable and correct.
     chunkSizeWarningLimit: 600,
     cssCodeSplit: true,
     target: 'es2020',
@@ -87,6 +70,7 @@ export default defineConfig({
       'framer-motion',
       'lucide-react',
       'react-hot-toast',
+      'recharts',
     ],
     exclude: ['chart.js', 'react-chartjs-2'],
   },

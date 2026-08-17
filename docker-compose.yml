@@ -332,7 +332,7 @@ services:
     networks:
       - financialedapp-network
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/healthz"]
+      test: ["CMD", "curl", "-sf", "http://localhost/healthz"]
       interval: 30s
       timeout: 10s
       retries: 3
