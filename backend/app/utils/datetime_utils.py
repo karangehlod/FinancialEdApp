@@ -16,7 +16,7 @@ def utcnow_naive() -> datetime:
     """Return the current UTC time as a **naive** datetime (no tzinfo).
 
     This is the correct replacement for the deprecated
-    ``datetime.utcnow()`` when the target column is
+    ``datetime.now(timezone.utc)`` when the target column is
     ``DateTime(timezone=False)``.
     """
     return datetime.now(timezone.utc).replace(tzinfo=None)

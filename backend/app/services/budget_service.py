@@ -2,7 +2,7 @@
 
 from typing import Optional, List, Any
 from uuid import UUID
-from datetime import date
+from datetime import date, timezone
 from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func
@@ -155,7 +155,7 @@ class FinancialProfileService:
                 )
                 profile.disposable_income = profile.monthly_salary - fixed_expenses
             
-            profile.updated_at = datetime.utcnow()
+            profile.updated_at = datetime.now(timezone.utc)
             await self.db.commit()
             await self.db.refresh(profile)
         

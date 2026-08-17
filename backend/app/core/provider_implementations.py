@@ -3,7 +3,7 @@
 import bcrypt
 import json
 from typing import Optional, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 from jose import JWTError, jwt
 
@@ -82,9 +82,9 @@ class JWTTokenProvider(TokenProvider):
         to_encode = data.copy()
         
         if expires_delta:
-            expire = datetime.utcnow() + expires_delta
+            expire = datetime.now(timezone.utc) + expires_delta
         else:
-            expire = datetime.utcnow() + timedelta(
+            expire = datetime.now(timezone.utc) + timedelta(
                 minutes=self.access_token_expire_minutes
             )
         
@@ -99,7 +99,7 @@ class JWTTokenProvider(TokenProvider):
     def create_refresh_token(self, data: dict) -> str:
         """Create a refresh token."""
         to_encode = data.copy()
-        expire = datetime.utcnow() + timedelta(days=self.refresh_token_expire_days)
+        expire = datetime.now(timezone.utc) + timedelta(days=self.refresh_token_expire_days)
         to_encode.update({"exp": expire, "type": "refresh"})
         encoded_jwt = jwt.encode(
             to_encode,
@@ -128,7 +128,7 @@ class JWTTokenProvider(TokenProvider):
             exp = payload.get("exp")
             if exp is None:
                 return True
-            return datetime.fromtimestamp(exp) < datetime.utcnow()
+            return datetime.fromtimestamp(exp) < datetime.now(timezone.utc)
         except Exception:
             return True
 

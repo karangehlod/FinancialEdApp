@@ -128,7 +128,7 @@ class OAuthAccountRepository:
                 access_token_encrypted=access_token_encrypted,
                 refresh_token_encrypted=refresh_token_encrypted,
                 token_expires_at=token_expires_at,
-                updated_at=datetime.utcnow(),
+                updated_at=datetime.now(timezone.utc),
             )
         )
 
@@ -147,7 +147,7 @@ class OAuthAccountRepository:
             )
             .values(
                 is_active=False,
-                updated_at=datetime.utcnow(),
+                updated_at=datetime.now(timezone.utc),
             )
         )
         rows_affected = result.rowcount

@@ -386,7 +386,7 @@ class OAuthService(BaseService):
         """
         import jwt as pyjwt
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         payload = {
             "iss": settings.APPLE_TEAM_ID,
             "iat": now,
@@ -456,7 +456,7 @@ class OAuthService(BaseService):
         enc_refresh = _encrypt(refresh_token) if refresh_token else None
         expires_at: Optional[datetime] = None
         if token_expires_in:
-            expires_at = datetime.utcnow() + timedelta(seconds=token_expires_in)
+            expires_at = datetime.now(timezone.utc) + timedelta(seconds=token_expires_in)
 
         # 1. Existing OAuth link
         existing_oauth = await self.oauth_repo.get_by_provider(provider, provider_uid)
@@ -540,7 +540,7 @@ class OAuthService(BaseService):
             data={"sub": str(user.id), "type": "refresh"},
         )
         token_hash = _sha256(refresh_token)
-        expires_at = datetime.utcnow() + timedelta(seconds=_REFRESH_TOKEN_TTL_SECONDS)
+        expires_at = datetime.now(timezone.utc) + timedelta(seconds=_REFRESH_TOKEN_TTL_SECONDS)
         await self.refresh_token_repo.create(
             user_id=user.id,
             token_hash=token_hash,
