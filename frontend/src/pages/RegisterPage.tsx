@@ -1,423 +1,391 @@
 /**
- * RegisterPage — strict TypeScript, WCAG 2.1 AA accessible registration form.
- *
- * Responsibilities (SRP):
- *  - Render registration form with real-time validation and password strength
- *  - Delegate auth to authStore
- *  - Delegate OAuth to OAuthButtons
+ * RegisterPage — matching two-column layout to LoginPage.
+ * Left: brand panel (lg+). Right: registration form.
+ * Pure Tailwind — no custom CSS classes.
  */
 
 import React, { useState, useCallback, type FormEvent, type ChangeEvent } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Lock, Mail, Eye, EyeOff, AlertCircle, CheckCircle, User } from 'lucide-react'
+import {
+  Lock, Mail, Eye, EyeOff, AlertCircle, User, ChevronRight,
+  TrendingUp, PiggyBank, Target, BarChart2,
+} from 'lucide-react'
 
 import FinEdLogo from '../assets/FinEdLogo.png'
-import { useAuthStore } from '../store/authStore'
-import { FluidIcon } from '../components/UI'
-import { Footer } from '../components/Footer'
-import OAuthButtons from '../components/OAuthButtons'
-import { showErrorToast, showSuccessToast } from '../utils/toast'
-import { validateEmail } from '../utils/helpers'
+import { useAuthStore } from '@/store/authStore'
+import OAuthButtons from '@/components/OAuthButtons'
+import { showSuccessToast, showErrorToast } from '@/utils/toast'
+import { validateEmail } from '@/utils/helpers'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-interface RegisterFormData {
-  name: string
+interface RegisterForm {
+  first_name: string
+  last_name: string
   email: string
   password: string
-  confirm_password: string
+  confirm: string
 }
 
-type RegisterFormErrors = Partial<Record<keyof RegisterFormData, string>>
+type FormErrors = Partial<Record<keyof RegisterForm, string>>
 
 type PasswordStrength = 0 | 1 | 2 | 3 | 4
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-const getPasswordStrength = (password: string): PasswordStrength => {
-  if (!password) return 0
-  let strength = 0
-  if (password.length >= 8) strength++
-  if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++
-  if (/\d/.test(password)) strength++
-  if (/[!@#$%^&*]/.test(password)) strength++
-  return strength as PasswordStrength
+const getStrength = (pw: string): PasswordStrength => {
+  if (!pw) return 0
+  let s = 0
+  if (pw.length >= 8)                              s++
+  if (/[a-z]/.test(pw) && /[A-Z]/.test(pw))       s++
+  if (/\d/.test(pw))                               s++
+  if (/[!@#$%^&*]/.test(pw))                       s++
+  return s as PasswordStrength
 }
 
-const strengthColorMap: Record<PasswordStrength, string> = {
-  0: 'bg-gray-300',
-  1: 'bg-red-400',
-  2: 'bg-orange-400',
-  3: 'bg-yellow-400',
-  4: 'bg-green-400',
+const strengthLabels: Record<PasswordStrength, { label: string; color: string }> = {
+  0: { label: '',        color: 'bg-gray-200 dark:bg-gray-700' },
+  1: { label: 'Weak',   color: 'bg-red-400' },
+  2: { label: 'Fair',   color: 'bg-orange-400' },
+  3: { label: 'Good',   color: 'bg-yellow-400' },
+  4: { label: 'Strong', color: 'bg-emerald-500' },
 }
 
-const strengthLabelMap: Record<PasswordStrength, string> = {
-  0: '',
-  1: 'Weak password',
-  2: 'Fair password',
-  3: 'Good password',
-  4: '💪 Strong password',
-}
+const STATS = [
+  { icon: TrendingUp, value: '50K+',  label: 'Users' },
+  { icon: PiggyBank,  value: '₹10Cr+', label: 'Tracked' },
+  { icon: Target,     value: '95%',   label: 'Goal Hit Rate' },
+  { icon: BarChart2,  value: '4.9★',  label: 'Rating' },
+]
 
-// ── Animation variants ─────────────────────────────────────────────────────
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 10 },
-  visible: { opacity: 1, y: 0, transition: { type: 'spring' as const, stiffness: 100, damping: 20 } },
-} as const
-
-// ── Sub-components ─────────────────────────────────────────────────────────
-
-interface FieldErrorProps {
-  message: string
-  id?: string
-}
-
-const FieldError: React.FC<FieldErrorProps> = ({ message, id }) => (
-  <motion.p
-    id={id}
-    className="text-sm-fluid text-red-600 mt-2 flex items-center gap-1"
-    initial={{ opacity: 0, y: -5 }}
-    animate={{ opacity: 1, y: 0 }}
-    role="alert"
-  >
-    <FluidIcon icon={AlertCircle} size="sm" className="text-red-600 dark:text-red-400" />
-    {message}
-  </motion.p>
-)
-
-interface PasswordStrengthBarProps {
-  strength: PasswordStrength
-}
-
-const PasswordStrengthBar: React.FC<PasswordStrengthBarProps> = ({ strength }) => (
-  <motion.div className="mt-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} aria-live="polite">
-    <div className="flex gap-1 mb-1" role="img" aria-label={`Password strength: ${strengthLabelMap[strength]}`}>
-      {([0, 1, 2, 3] as const).map((i) => (
-        <div
-          key={i}
-          className={`h-1 flex-1 rounded-full transition-all ${i < strength ? strengthColorMap[strength] : 'bg-gray-200'}`}
-        />
-      ))}
-    </div>
-    <p className="text-xs text-gray-500">{strengthLabelMap[strength]}</p>
-  </motion.div>
-)
-
-// ── Main component ─────────────────────────────────────────────────────────
+// ── Component ──────────────────────────────────────────────────────────────
 
 export const RegisterPage: React.FC = () => {
-  const navigate = useNavigate()
-  const { register, isLoading, error } = useAuthStore()
+  const navigate  = useNavigate()
+  const { register, isLoading, error, clearError } = useAuthStore()
 
-  const [formData, setFormData] = useState<RegisterFormData>({
-    name: '',
-    email: '',
-    password: '',
-    confirm_password: '',
+  const [form, setForm]       = useState<RegisterForm>({
+    first_name: '', last_name: '', email: '', password: '', confirm: '',
   })
-  const [formErrors, setFormErrors] = useState<RegisterFormErrors>({})
-  const [showPassword, setShowPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [focusedField, setFocusedField] = useState<string | null>(null)
-  const passwordStrength = getPasswordStrength(formData.password)
+  const [errors, setErrors]   = useState<FormErrors>({})
+  const [showPw, setShowPw]   = useState(false)
+  const [showCf, setShowCf]   = useState(false)
 
-  const handleFieldChange = useCallback(
-    (field: keyof RegisterFormData) =>
+  const strength = getStrength(form.password)
+  const sInfo    = strengthLabels[strength]
+
+  const setField = useCallback(
+    (field: keyof RegisterForm) =>
       (e: ChangeEvent<HTMLInputElement>) => {
-        setFormData((prev) => ({ ...prev, [field]: e.target.value }))
+        setForm(p => ({ ...p, [field]: e.target.value }))
+        setErrors(p => ({ ...p, [field]: '' }))
       },
-    []
+    [],
   )
 
-  const validateForm = useCallback((): RegisterFormErrors => {
-    const errors: RegisterFormErrors = {}
-    if (!formData.name) errors.name = 'Name is required'
-    if (!formData.email) errors.email = 'Email is required'
-    else if (!validateEmail(formData.email)) errors.email = 'Invalid email format'
-    if (!formData.password) errors.password = 'Password is required'
-    else if (formData.password.length < 8) errors.password = 'Password must be at least 8 characters'
-    if (!formData.confirm_password) errors.confirm_password = 'Please confirm your password'
-    else if (formData.password !== formData.confirm_password)
-      errors.confirm_password = 'Passwords do not match'
-    return errors
-  }, [formData])
+  const validate = useCallback((): FormErrors => {
+    const errs: FormErrors = {}
+    if (!form.first_name.trim()) errs.first_name = 'First name is required'
+    if (!form.last_name.trim())  errs.last_name  = 'Last name is required'
+    if (!form.email)             errs.email      = 'Email is required'
+    else if (!validateEmail(form.email)) errs.email = 'Invalid email format'
+    if (!form.password)          errs.password   = 'Password is required'
+    else if (form.password.length < 8) errs.password = 'Minimum 8 characters'
+    if (form.confirm !== form.password) errs.confirm = 'Passwords do not match'
+    return errs
+  }, [form])
 
-  const handleSubmit = useCallback(
-    async (e: FormEvent<HTMLFormElement>) => {
-      e.preventDefault()
-      const errors = validateForm()
-      if (Object.keys(errors).length > 0) {
-        setFormErrors(errors)
-        return
-      }
+  const handleSubmit = useCallback(async (e: FormEvent) => {
+    e.preventDefault()
+    clearError()
+    const errs = validate()
+    if (Object.keys(errs).length > 0) { setErrors(errs); return }
 
-      try {
-        await register({
-          first_name: formData.name.split(' ')[0] ?? formData.name,
-          last_name: formData.name.split(' ').slice(1).join(' ') || formData.name,
-          email: formData.email,
-          password: formData.password,
-        })
-        showSuccessToast('Registration successful! Please log in.')
-        try {
-          window.location.replace('/login')
-        } catch {
-          navigate('/login')
-        }
-      } catch {
-        showErrorToast(error ?? 'Registration failed')
-      }
-    },
-    [formData, validateForm, register, error, navigate]
-  )
+    try {
+      await register({
+        first_name: form.first_name.trim(),
+        last_name:  form.last_name.trim(),
+        email:      form.email,
+        password:   form.password,
+      })
+      showSuccessToast('Account created! Please sign in.')
+      navigate('/login')
+    } catch {
+      showErrorToast(error ?? 'Registration failed. Please try again.')
+    }
+  }, [form, validate, register, error, clearError, navigate])
 
-  const buildInputClass = (field: keyof RegisterFormData): string =>
-    [
-      'w-full pl-10 pr-4 py-3 border-2 rounded-lg transition-all duration-200 shadow-sm',
-      'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none',
-      focusedField === field
-        ? 'border-indigo-500 bg-indigo-50 dark:bg-gray-600 ring-2 ring-indigo-200 dark:ring-indigo-800'
-        : formErrors[field]
-          ? 'border-red-300 bg-red-50 dark:bg-red-900/20 ring-1 ring-red-200 dark:ring-red-800'
-          : 'border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 hover:border-gray-300 dark:hover:border-gray-500',
-    ].join(' ')
+  // ── Input class builder ────────────────────────────────────────────────
 
-  const passwordInputClass = (field: 'password' | 'confirm_password'): string =>
-    [
-      'w-full pl-10 pr-12 py-3 border-2 rounded-lg transition-all duration-200 shadow-sm',
-      'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-300 dark:focus:ring-indigo-700',
-      focusedField === field
-        ? 'border-indigo-500 bg-indigo-50 dark:bg-gray-600 ring-2 ring-indigo-200 dark:ring-indigo-800'
-        : formErrors[field]
-          ? 'border-red-300 bg-red-50 dark:bg-red-900/20 ring-1 ring-red-200 dark:ring-red-800'
-          : 'border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 hover:border-gray-300 dark:hover:border-gray-500',
-    ].join(' ')
+  const inp = (field: keyof RegisterForm) => `
+    w-full pl-10 pr-4 py-2.5 rounded-xl border text-sm transition
+    bg-white dark:bg-gray-800 text-gray-900 dark:text-white
+    focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500
+    ${errors[field]
+      ? 'border-red-400 dark:border-red-600'
+      : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'}
+  `
+
+  // ── Render ─────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-gray-900 dark:to-slate-900 flex flex-col relative overflow-hidden">
-      <div className="flex-1 flex flex-col items-center justify-center p-4 relative">
-        {/* Desktop header: show logo + name + slogan with a Login link on md+ */}
-        <header className="app-header auth-top-header hidden md:flex w-full mb-4">
-          <div className="app-header-inner">
-            <div className="flex items-center gap-3">
-              <div className="hero-logo" style={{ width: 'var(--page-hero-icon-size)', height: 'var(--page-hero-icon-size)' }}>
-                <img src={FinEdLogo} alt="FinEd logo" className="object-contain w-full h-full" />
-              </div>
-              <div className="text-left">
-                <h1 className="text-heading-lg font-bold text-gray-900 dark:text-gray-100">Create Account</h1>
-                <p className="text-sm-fluid text-gray-600 dark:text-gray-400">Join FinEd and start managing your finances</p>
-              </div>
-            </div>
-            <div className="flex items-center">
-              <Link to="/login" className="text-sm-fluid text-indigo-600 hover:text-indigo-700 font-semibold">
-                Login
-              </Link>
-            </div>
+    <div className="min-h-screen flex flex-col lg:flex-row bg-gray-50 dark:bg-gray-950">
+
+      {/* ── Left panel (lg+) ──────────────────────────────────────────── */}
+      <div className="hidden lg:flex lg:w-[44%] xl:w-2/5 flex-col justify-between
+                      bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-700
+                      p-10 xl:p-14 text-white flex-shrink-0">
+
+        {/* Brand */}
+        <div className="flex items-center gap-3">
+          <img src={FinEdLogo} alt="FinEd" className="w-10 h-10 rounded-xl object-contain" />
+          <div>
+            <p className="font-bold text-lg leading-tight">FinEd</p>
+            <p className="text-emerald-200 text-sm leading-tight">Master Your Financial Future</p>
           </div>
-        </header>
-
-        {/* Mobile header: compact header with logo + title for small screens */}
-        <header className="auth-page-header mb-4 md:hidden">
-          <div className="flex items-center justify-center gap-3">
-            <div className="hero-logo" style={{ width: 'var(--page-hero-icon-size)', height: 'var(--page-hero-icon-size)' }}>
-              <img src={FinEdLogo} alt="FinEd logo" className="object-contain w-full h-full" />
-            </div>
-            <div className="text-center">
-              <h1 className="text-xl-fluid font-bold text-gray-900 dark:text-gray-100">Create Account</h1>
-              <p className="text-sm-fluid text-gray-600 dark:text-gray-400">Join FinEd and start managing your finances</p>
-            </div>
-          </div>
-        </header>
-
-        <div className="w-full">
-          <div className="auth-split">
-            <div className="auth-left">
-              <div className="hero-inner">
-                <motion.div className="mb-6 auth-hero" variants={itemVariants}>
-                  {/* Hero visuals removed from left column to keep focus on features + form (logo/title/strapline intentionally omitted) */}
-                </motion.div>
-
-                {/* Moved form under hero and features so content is on the left */}
-                <div className="mt-4 w-full">
-                  {/* Features (moved from footer) */}
-                  <motion.div className="mt-4 text-left" variants={itemVariants}>
-                    <h3 className="font-semibold mb-2">Features</h3>
-                    <ul className="space-y-1 text-sm text-gray-600 dark:text-gray-400 list-inside">
-                      <li>💸 Expense Tracking &amp; Categorisation</li>
-                      <li>📊 Monthly Budget Management</li>
-                      <li>🎯 Savings Goals</li>
-                      <li>🏦 Loan &amp; EMI Calculator</li>
-                      <li>📈 Financial Reports &amp; Analytics</li>
-                      <li>🔔 Smart Notifications &amp; Alerts</li>
-                      <li>🤖 AI-Powered Financial Chat</li>
-                      <li>🔐 Two-Factor Authentication (2FA)</li>
-                      <li>🇪🇺 GDPR Data Export &amp; Deletion</li>
-                    </ul>
-                  </motion.div>
-                </div>
-              </div>
-            </div>
-
-            {/* Right column — contains the register form so hero/features (left) and form (right) sit side-by-side on md+ */}
-            <div className="auth-right">
-              <div className="mt-4 w-full">
-                <motion.form
-                  onSubmit={handleSubmit}
-                  noValidate
-                  aria-label="Register form"
-                  className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl dark:shadow-xl dark:shadow-black/20 p-6 space-y-4 auth-form"
-                  variants={itemVariants}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3 }}
-                >
-                  {/* Name Field */}
-                  <motion.div variants={itemVariants}>
-                    <label htmlFor="register-name" className="block text-sm-fluid font-semibold text-gray-900 dark:text-gray-200 mb-2">
-                      Full name
-                    </label>
-                    <motion.div className="relative">
-                      <div className="absolute left-3 top-1/2 -translate-y-1/2" aria-hidden>
-                        <FluidIcon icon={User} size="sm" className="text-gray-400 dark:text-gray-500" />
-                      </div>
-                      <input
-                        id="register-name"
-                        type="text"
-                        value={formData.name}
-                        onChange={handleFieldChange('name')}
-                        onFocus={() => setFocusedField('name')}
-                        onBlur={() => setFocusedField(null)}
-                        className={buildInputClass('name')}
-                        placeholder="Your full name"
-                      />
-                    </motion.div>
-                    {formErrors.name && <FieldError id="name-error" message={formErrors.name} />}
-                  </motion.div>
-
-                  {/* Email */}
-                  <motion.div variants={itemVariants}>
-                    <label htmlFor="register-email" className="block text-sm-fluid font-semibold text-gray-900 dark:text-gray-200 mb-2">
-                      Email
-                    </label>
-                    <motion.div className="relative">
-                      <div className="absolute left-3 top-1/2 -translate-y-1/2" aria-hidden>
-                        <FluidIcon icon={Mail} size="sm" className="text-gray-400 dark:text-gray-500" />
-                      </div>
-                      <input
-                        id="register-email"
-                        type="email"
-                        value={formData.email}
-                        onChange={handleFieldChange('email')}
-                        onFocus={() => setFocusedField('email')}
-                        onBlur={() => setFocusedField(null)}
-                        className={buildInputClass('email')}
-                        placeholder="you@example.com"
-                      />
-                    </motion.div>
-                    {formErrors.email && <FieldError id="email-error" message={formErrors.email} />}
-                  </motion.div>
-
-                  {/* Password */}
-                  <motion.div variants={itemVariants}>
-                    <label htmlFor="register-password" className="block text-sm-fluid font-semibold text-gray-900 dark:text-gray-200 mb-2">
-                      Password
-                    </label>
-                    <motion.div className="relative">
-                      <div className="absolute left-3 top-1/2 -translate-y-1/2" aria-hidden>
-                        <FluidIcon icon={Lock} size="sm" className="text-gray-400 dark:text-gray-500" />
-                      </div>
-                      <input
-                        id="register-password"
-                        type={showPassword ? 'text' : 'password'}
-                        value={formData.password}
-                        onChange={handleFieldChange('password')}
-                        onFocus={() => setFocusedField('password')}
-                        onBlur={() => setFocusedField(null)}
-                        className={passwordInputClass('password')}
-                        placeholder="Choose a strong password"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword((v) => !v)}
-                        aria-label={showPassword ? 'Hide password' : 'Show password'}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                      >
-                        <FluidIcon icon={showPassword ? EyeOff : Eye} size="sm" className="text-gray-400" />
-                      </button>
-                    </motion.div>
-                    {formErrors.password && <FieldError id="password-error" message={formErrors.password} />}
-                    <PasswordStrengthBar strength={passwordStrength} />
-                  </motion.div>
-
-                  {/* Confirm Password */}
-                  <motion.div variants={itemVariants}>
-                    <label htmlFor="register-confirm" className="block text-sm-fluid font-semibold text-gray-900 dark:text-gray-200 mb-2">
-                      Confirm password
-                    </label>
-                    <motion.div className="relative">
-                      <div className="absolute left-3 top-1/2 -translate-y-1/2" aria-hidden>
-                        <FluidIcon icon={Lock} size="sm" className="text-gray-400 dark:text-gray-500" />
-                      </div>
-                      <input
-                        id="register-confirm"
-                        type={showConfirmPassword ? 'text' : 'password'}
-                        value={formData.confirm_password}
-                        onChange={handleFieldChange('confirm_password')}
-                        onFocus={() => setFocusedField('confirm_password')}
-                        onBlur={() => setFocusedField(null)}
-                        className={passwordInputClass('confirm_password')}
-                        placeholder="Confirm your password"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowConfirmPassword((v) => !v)}
-                        aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                      >
-                        <FluidIcon icon={showConfirmPassword ? EyeOff : Eye} size="sm" className="text-gray-400" />
-                      </button>
-                    </motion.div>
-                    {formErrors.confirm_password && <FieldError id="confirm-error" message={formErrors.confirm_password} />}
-                  </motion.div>
-
-                  <motion.button
-                    type="submit"
-                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? 'Creating…' : 'Create account'}
-                  </motion.button>
-
-                  <motion.div className="flex items-center gap-3" variants={itemVariants} aria-hidden>
-                    <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
-                    <span className="text-sm-fluid text-gray-500 dark:text-gray-400">or</span>
-                    <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
-                  </motion.div>
-
-                  <motion.div variants={itemVariants} className="oauth-row">
-                    <OAuthButtons
-                      redirectUri={`${window.location.origin}/auth/callback`}
-                      compact={true}
-                      showDivider={false}
-                      onSuccess={() => showSuccessToast('Account created - please log in')}
-                      onError={(e: Error) => showErrorToast(e.message)}
-                    />
-                  </motion.div>
-                </motion.form>
-              </div>
-            </div>
-          </div>
-
-          {/* Footer Info */}
-          <motion.div className="mt-8 text-center text-sm-fluid text-gray-600 dark:text-gray-400" variants={itemVariants}>
-            <p>🔒 Your data is secure and encrypted</p>
-          </motion.div>
         </div>
+
+        {/* Hero copy */}
+        <div className="space-y-8">
+          <div>
+            <h2 className="text-3xl xl:text-4xl font-extrabold leading-tight">
+              Your financial journey<br />starts here. Free.
+            </h2>
+            <p className="mt-3 text-emerald-100 text-base leading-relaxed max-w-xs">
+              Join thousands of users who have already transformed their finances with FinEd.
+            </p>
+          </div>
+
+          {/* Stats grid */}
+          <div className="grid grid-cols-2 gap-4">
+            {STATS.map(({ icon: Icon, value, label }) => (
+              <div key={label}
+                className="bg-white/10 rounded-2xl p-4 flex flex-col gap-1 backdrop-blur-sm">
+                <Icon size={20} className="text-emerald-200" />
+                <p className="text-2xl font-extrabold">{value}</p>
+                <p className="text-xs text-emerald-200">{label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Testimonial */}
+          <blockquote className="border-l-2 border-emerald-300 pl-4 italic text-sm text-emerald-100">
+            "FinEd helped me save ₹2 lakh in under 6 months by showing me exactly where my money was going."
+            <footer className="mt-1 not-italic text-emerald-300 text-xs">— Priya, Bangalore</footer>
+          </blockquote>
+        </div>
+
+        <p className="text-emerald-300 text-xs">
+          © {new Date().getFullYear()} FinancialEdApp. Your data stays private.
+        </p>
       </div>
-      <Footer />
+
+      {/* ── Right panel — form ─────────────────────────────────────────── */}
+      <div className="flex-1 flex flex-col items-center justify-center
+                      px-5 py-10 sm:px-8 lg:px-12 xl:px-16">
+
+        {/* Mobile brand */}
+        <div className="lg:hidden flex flex-col items-center gap-2 mb-8">
+          <img src={FinEdLogo} alt="FinEd" className="w-14 h-14 rounded-2xl object-contain" />
+          <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white">FinEd</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Master Your Financial Future</p>
+        </div>
+
+        {/* Card */}
+        <motion.div
+          className="w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-xl
+                     border border-gray-100 dark:border-gray-800 p-8 sm:p-10"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35 }}
+        >
+          <div className="mb-7">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Create your account</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              Free forever. No credit card required.
+            </p>
+          </div>
+
+          {/* Global error */}
+          {error && (
+            <motion.div
+              className="flex items-start gap-2 p-3 mb-5 rounded-xl
+                         bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-sm"
+              initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
+            >
+              <AlertCircle size={15} className="text-red-500 mt-0.5 flex-shrink-0" />
+              <span className="text-red-700 dark:text-red-400 flex-1">{error}</span>
+              <button onClick={clearError} className="ml-auto text-red-500 font-bold text-base leading-none">×</button>
+            </motion.div>
+          )}
+
+          <form onSubmit={handleSubmit} noValidate className="space-y-4">
+
+            {/* Name row */}
+            <div className="grid grid-cols-2 gap-3">
+              {(['first_name', 'last_name'] as const).map((field) => (
+                <div key={field}>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                    {field === 'first_name' ? 'First name' : 'Last name'}
+                  </label>
+                  <div className="relative">
+                    <User size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      autoComplete={field === 'first_name' ? 'given-name' : 'family-name'}
+                      placeholder={field === 'first_name' ? 'Karan' : 'Gehlod'}
+                      value={form[field]}
+                      onChange={setField(field)}
+                      className={inp(field)}
+                    />
+                  </div>
+                  {errors[field] && (
+                    <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
+                      <AlertCircle size={11} />{errors[field]}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Email */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                Email Address
+              </label>
+              <div className="relative">
+                <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="email"
+                  autoComplete="email"
+                  placeholder="you@example.com"
+                  value={form.email}
+                  onChange={setField('email')}
+                  className={inp('email')}
+                />
+              </div>
+              {errors.email && (
+                <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
+                  <AlertCircle size={11} />{errors.email}
+                </p>
+              )}
+            </div>
+
+            {/* Password */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                Password
+              </label>
+              <div className="relative">
+                <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type={showPw ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  placeholder="Min 8 characters"
+                  value={form.password}
+                  onChange={setField('password')}
+                  className={`${inp('password')} pr-11`}
+                />
+                <button type="button" tabIndex={-1} onClick={() => setShowPw(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+              {/* Strength bar */}
+              {form.password && (
+                <div className="mt-2 space-y-1">
+                  <div className="flex gap-1">
+                    {([1, 2, 3, 4] as const).map(n => (
+                      <div key={n}
+                        className={`h-1 flex-1 rounded-full transition-all duration-300
+                                    ${n <= strength ? sInfo.color : 'bg-gray-200 dark:bg-gray-700'}`} />
+                    ))}
+                  </div>
+                  {sInfo.label && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Strength: <span className="font-medium">{sInfo.label}</span>
+                    </p>
+                  )}
+                </div>
+              )}
+              {errors.password && (
+                <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
+                  <AlertCircle size={11} />{errors.password}
+                </p>
+              )}
+            </div>
+
+            {/* Confirm password */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                Confirm Password
+              </label>
+              <div className="relative">
+                <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type={showCf ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  placeholder="Re-enter your password"
+                  value={form.confirm}
+                  onChange={setField('confirm')}
+                  className={`${inp('confirm')} pr-11`}
+                />
+                <button type="button" tabIndex={-1} onClick={() => setShowCf(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  {showCf ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+              {errors.confirm && (
+                <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
+                  <AlertCircle size={11} />{errors.confirm}
+                </p>
+              )}
+            </div>
+
+            {/* Terms */}
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              By creating an account you agree to our{' '}
+              <Link to="/terms" className="text-indigo-600 dark:text-indigo-400 hover:underline">Terms</Link>
+              {' '}and{' '}
+              <Link to="/privacy" className="text-indigo-600 dark:text-indigo-400 hover:underline">Privacy Policy</Link>.
+            </p>
+
+            {/* Submit */}
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60
+                         text-white font-semibold text-sm flex items-center justify-center gap-2 transition"
+            >
+              {isLoading ? (
+                <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              ) : (
+                <>Create Free Account <ChevronRight size={15} /></>
+              )}
+            </button>
+          </form>
+
+          {/* Divider + OAuth */}
+          <div className="flex items-center gap-3 my-5">
+            <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+            <span className="text-xs text-gray-400">or sign up with</span>
+            <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+          </div>
+
+          <OAuthButtons
+            onSuccess={() => { showSuccessToast('Signed up!'); navigate('/dashboard') }}
+            onError={(msg) => showErrorToast(msg ?? 'OAuth signup failed')}
+          />
+
+          <p className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
+            Already have an account?{' '}
+            <Link to="/login" className="text-indigo-600 dark:text-indigo-400 font-semibold hover:underline">
+              Sign in
+            </Link>
+          </p>
+        </motion.div>
+      </div>
     </div>
   )
 }
