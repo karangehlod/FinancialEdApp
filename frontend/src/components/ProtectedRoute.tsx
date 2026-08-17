@@ -62,17 +62,6 @@ function AccessDenied(): JSX.Element {
   )
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────────
-
-function isAdminUser(email: string | undefined | null): boolean {
-  if (!email) return false
-  const adminEmails = (import.meta.env.VITE_ADMIN_EMAILS as string | undefined ?? '')
-    .split(',')
-    .map((e: string) => e.trim().toLowerCase())
-    .filter(Boolean)
-  return adminEmails.includes(email.toLowerCase())
-}
-
 // ── Component ──────────────────────────────────────────────────────────
 
 export const ProtectedRoute = memo<ProtectedRouteProps>(function ProtectedRoute({
@@ -97,9 +86,9 @@ export const ProtectedRoute = memo<ProtectedRouteProps>(function ProtectedRoute(
     return <Navigate to="/login" replace />
   }
 
-  // 4. RBAC check
+  // 4. RBAC — uses is_admin flag from backend (server-authoritative, not env var)
   if (allowedRoles && allowedRoles.length > 0) {
-    const userRoles: UserRole[] = isAdminUser(user?.email) ? ['admin', 'user'] : ['user']
+    const userRoles: UserRole[] = user?.is_admin === true ? ['admin', 'user'] : ['user']
     const hasRole = allowedRoles.some((role) => userRoles.includes(role))
     if (!hasRole) {
       return <AccessDenied />

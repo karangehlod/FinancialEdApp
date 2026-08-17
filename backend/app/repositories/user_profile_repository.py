@@ -27,7 +27,7 @@ class UserProfileRepository(IUserProfileRepository):
             knowledge_level=profile_data.knowledge_level if profile_data else None,
             risk_tolerance=profile_data.risk_tolerance if profile_data else None,
             consent_given=profile_data.consent_given if profile_data else False,
-            consent_timestamp=datetime.now(timezone.utc) if profile_data and profile_data.consent_given else None
+            consent_timestamp=datetime.now(timezone.utc).replace(tzinfo=None) if profile_data and profile_data.consent_given else None
         )
         
         self.db.add(new_profile)

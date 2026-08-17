@@ -1,5 +1,5 @@
 # Stage 1: Builder
-FROM python:3.11-slim as builder
+FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
@@ -13,8 +13,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --user --no-cache-dir -r requirements.txt
 
-# Stage 2: Runtime
-FROM python:3.11-slim
+# Stage 2: Runtime  ← named so docker-compose can use target: runtime
+FROM python:3.11-slim AS runtime
 
 WORKDIR /app
 
@@ -33,6 +33,12 @@ COPY --from=builder /root/.local /home/appuser/.local
 # Copy application code
 COPY --chown=appuser:appuser . .
 
+# Create logs dir with correct ownership before switching to appuser
+RUN mkdir -p /app/logs && chown appuser:appuser /app/logs
+
+# Make entrypoint executable
+RUN chmod +x entrypoint.sh
+
 # Set environment variables
 ENV PATH=/home/appuser/.local/bin:$PATH \
     PYTHONUNBUFFERED=1 \
@@ -49,5 +55,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 # Expose port
 EXPOSE 8000
 
-# Run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run via entrypoint (seeds demo users, then starts uvicorn)
+ENTRYPOINT ["./entrypoint.sh"]

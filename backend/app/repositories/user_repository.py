@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from app.repositories.interfaces import IUserRepository
 from app.db.models.auth import User
 from app.schemas.auth import UserCreate
-from app.utils.security import get_password_hash
+from app.core.security import get_password_hash
 
 
 class UserRepository(IUserRepository):
@@ -64,7 +64,7 @@ class UserRepository(IUserRepository):
         user = result.scalar_one_or_none()
         
         if user:
-            user.last_login = datetime.now(timezone.utc)
+            user.last_login = datetime.now(timezone.utc).replace(tzinfo=None)
             await self.db.commit()
     
     async def delete_user(self, user_id: UUID) -> bool:
@@ -89,7 +89,7 @@ class UserRepository(IUserRepository):
         
         if user:
             user.password_hash = new_password_hash
-            user.updated_at = datetime.now(timezone.utc)
+            user.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
             await self.db.commit()
             return True
         return False

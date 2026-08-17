@@ -53,8 +53,8 @@ class NotificationService:
             related_resource_id=uuid.UUID(related_resource_id) if related_resource_id else None,
             related_resource_type=related_resource_type,
             is_read=False,
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            updated_at=datetime.now(timezone.utc).replace(tzinfo=None),
         )
 
         self.db_session.add(notification)
@@ -161,7 +161,7 @@ class NotificationService:
         """
         notification = await self.get_notification(notification_id, user_id)
         notification.is_read = True
-        notification.updated_at = datetime.now(timezone.utc)
+        notification.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
         self.db_session.add(notification)
         await self.db_session.commit()
@@ -195,7 +195,7 @@ class NotificationService:
 
         for notification in notifications:
             notification.is_read = True
-            notification.updated_at = datetime.now(timezone.utc)
+            notification.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
         self.db_session.add_all(notifications)
         await self.db_session.commit()
@@ -241,7 +241,7 @@ class NotificationService:
         """
         from datetime import timedelta
 
-        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
+        cutoff_date = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
 
         result = await self.db_session.execute(
             select(Notification).where(

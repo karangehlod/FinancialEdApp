@@ -146,7 +146,7 @@ class LoanService:
             elif schedule:
                 loan.outstanding_balance = schedule[-1].remaining_balance
         
-        loan.updated_at = datetime.now(timezone.utc)
+        loan.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         await self.db.commit()
         await self.db.refresh(loan)
         
@@ -223,7 +223,7 @@ class LoanService:
             loan.remaining_months = max(0, loan.remaining_months - 1)
             loan.next_due_date = DueDate.calculate_next_due_date(payment_data.payment_date)
         
-        loan.updated_at = datetime.now(timezone.utc)
+        loan.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         
         await self.db.commit()
         await self.db.refresh(db_payment)
@@ -668,7 +668,7 @@ class LoanService:
         if loan_config.effective_date:
             loan.next_due_date = DueDate.calculate_next_due_date(loan_config.effective_date)
         
-        loan.updated_at = datetime.now(timezone.utc)
+        loan.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         await self.db.commit()
         await self.db.refresh(loan)
         

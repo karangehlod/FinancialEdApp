@@ -1,5 +1,3 @@
-version: '3.8'
-
 # =============================================================================
 # FinancialEdApp — Docker Compose
 # =============================================================================
@@ -39,7 +37,7 @@ services:
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=en_US.UTF-8"
     volumes:
       - postgres_auth_data:/var/lib/postgresql/data
-      - ./database_setup/db/init/01-auth-init.sql:/docker-entrypoint-initdb.d/01-auth-init.sql:ro
+      - ./database_setup/db/init/02-auth-init.sql:/docker-entrypoint-initdb.d/01-auth-init.sql:ro
     ports:
       - "${AUTH_DB_EXPOSED_PORT:-55432}:5432"
     healthcheck:
@@ -66,7 +64,7 @@ services:
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=en_US.UTF-8"
     volumes:
       - postgres_data_data:/var/lib/postgresql/data
-      - ./database_setup/db/init/02-data-init.sql:/docker-entrypoint-initdb.d/02-data-init.sql:ro
+      - ./database_setup/db/init/03-data-init.sql:/docker-entrypoint-initdb.d/01-data-init.sql:ro
     ports:
       - "${DATA_DB_EXPOSED_PORT:-55433}:5432"
     healthcheck:
@@ -119,7 +117,7 @@ services:
     image: financialedapp-backend:${APP_VERSION:-1.0.0}
     container_name: financialedapp-api
     restart: unless-stopped
-    env_file: .env
+    env_file: .env.docker
     environment:
       # --- Application ---
       APP_NAME: ${APP_NAME:-FinancialEdApp}
@@ -130,7 +128,7 @@ services:
       API_V1_PREFIX: ${API_V1_PREFIX:-/api/v1}
 
       # --- CORS ---
-      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:13000}
 
       # --- JWT / Security ---
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
@@ -238,9 +236,7 @@ services:
       redis:
         condition: service_healthy
     ports:
-      - "${BACKEND_PORT:-8000}:8000"
-    volumes:
-      - logs:/app/logs
+      - "${BACKEND_PORT:-18000}:8000"
     networks:
       - financialedapp-network
     healthcheck:
@@ -263,8 +259,10 @@ services:
     image: financialedapp-backend:${APP_VERSION:-1.0.0}
     container_name: financialedapp-worker
     restart: unless-stopped
-    command: ["python", "-m", "arq", "app.core.worker.WorkerSettings"]
-    env_file: .env
+    entrypoint: ["python", "-m", "arq", "app.core.worker.WorkerSettings"]
+    healthcheck:
+      disable: true
+    env_file: .env.docker
     environment:
       # Same environment block as backend — worker reads all the same settings
       APP_NAME: ${APP_NAME:-FinancialEdApp}
@@ -308,8 +306,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - logs:/app/logs
     networks:
       - financialedapp-network
     logging: *default-logging
@@ -322,10 +318,9 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000/api/v1}
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:18000/api/v1}
         VITE_APP_NAME: ${APP_NAME:-FinancialEdApp}
         VITE_APP_VERSION: ${APP_VERSION:-1.0.0}
-        VITE_ADMIN_EMAILS: ${ADMIN_EMAILS:-}
     image: financialedapp-frontend:${APP_VERSION:-1.0.0}
     container_name: financialedapp-web
     restart: unless-stopped
@@ -333,15 +328,15 @@ services:
       backend:
         condition: service_healthy
     ports:
-      - "${FRONTEND_PORT:-3000}:3000"
+      - "${FRONTEND_PORT:-13000}:80"
     networks:
       - financialedapp-network
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/healthz"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 30s
+      start_period: 15s
     logging: *default-logging
 
 # =============================================================================
@@ -365,4 +360,4 @@ networks:
     driver: bridge
     ipam:
       config:
-        - subnet: 172.20.0.0/16
+        - subnet: 172.21.0.0/16

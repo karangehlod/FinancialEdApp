@@ -11,12 +11,13 @@ import { DashboardDataService } from './DashboardDataService'
 import { FluidGrid } from '../FluidGrid'
 import { StatCard } from '../StatCard'
 import { ChartGuard } from './ChartGuard'
+import type { Expense, Budget, Goal, Loan } from '@/types'
 
 interface OverviewTabProps {
-  expenses?: any[]
-  budgets?: any[]
-  goals?: any[]
-  loans?: any[]
+  expenses?: Expense[]
+  budgets?: Budget[]
+  goals?: Goal[]
+  loans?: Loan[]
 }
 
 export const OverviewTab: React.FC<OverviewTabProps> = ({ expenses = [], budgets = [], goals = [], loans = [] }) => {

@@ -24,10 +24,6 @@ import {
 import { useAuthStore } from '../store/authStore'
 import { OverviewTab } from '../components/dashboard/OverviewTab'
 
-// OverviewTab is a JSX component without TS declarations — bridge with any
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const OverviewTabBridge = OverviewTab as React.ComponentType<Record<string, unknown>>
-
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -123,7 +119,7 @@ export const DashboardPage: React.FC = () => {
             <LoadingSpinner size="lg" />
           </motion.div>
         ) : (
-        <OverviewTabBridge
+        <OverviewTab
             expenses={[...expenses]}
             budgets={[...budgets]}
             goals={[...goals]}

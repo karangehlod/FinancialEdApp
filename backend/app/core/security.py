@@ -10,11 +10,14 @@ from app.config import settings
 
 def hash_password(password: str) -> str:
     """Hash a plain text password using bcrypt."""
-    # Convert password to bytes and hash
     password_bytes = password.encode('utf-8')
     salt = bcrypt.gensalt()
     hashed = bcrypt.hashpw(password_bytes, salt)
     return hashed.decode('utf-8')
+
+
+# Alias used by repositories that import from this module
+get_password_hash = hash_password
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:

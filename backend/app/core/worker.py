@@ -26,6 +26,8 @@ Design decisions:
 
 import logging
 import os
+
+from arq import cron
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 from uuid import UUID
@@ -266,7 +268,12 @@ class WorkerSettings:
     Start with: `arq app.core.worker.WorkerSettings`
     """
 
-    redis_settings = None  # Set dynamically below
+    # Read REDIS_URL at class-definition time so `arq WorkerSettings` picks it up directly
+    try:
+        from arq.connections import RedisSettings as _ARQRedisSettings
+        redis_settings = _ARQRedisSettings.from_dsn(os.getenv("REDIS_URL", "redis://localhost:6379"))
+    except Exception:
+        redis_settings = None
 
     functions = [
         send_budget_alert_task,
@@ -285,48 +292,14 @@ class WorkerSettings:
     max_tries = 3
     job_timeout = 60  # seconds per job
 
-    # Cron jobs
+    # Cron jobs — must use arq.cron() instances
     cron_jobs = [
-        # Daily at 07:00 UTC — process recurring expenses
-        {
-            "name": "process_recurring_expenses",
-            "coroutine": process_recurring_expenses_task,
-            "hour": 7,
-            "minute": 0,
-        },
-        # Daily at 09:00 UTC — send loan reminders
-        {
-            "name": "send_loan_reminders_cron",
-            "coroutine": send_loan_reminders_cron_task,
-            "hour": 9,
-            "minute": 0,
-        },
-        # Every hour — refresh exchange rates cache (P2-7)
-        {
-            "name": "refresh_exchange_rates",
-            "coroutine": refresh_exchange_rates_task,
-            "minute": {0},  # every hour at :00
-        },
-        # Daily at 02:00 UTC — GDPR data retention sweep (P2-5)
-        {
-            "name": "purge_inactive_accounts",
-            "coroutine": purge_inactive_accounts_task,
-            "hour": 2,
-            "minute": 0,
-        },
-        # Every hour at :30 — clean up notification dedup log (P2-4)
-        {
-            "name": "cleanup_notification_dedup",
-            "coroutine": cleanup_notification_dedup_task,
-            "minute": {30},
-        },
-        # Daily at 03:00 UTC — purge expired refresh tokens
-        {
-            "name": "purge_expired_refresh_tokens",
-            "coroutine": purge_expired_refresh_tokens_task,
-            "hour": 3,
-            "minute": 0,
-        },
+        cron(process_recurring_expenses_task,   hour=7,  minute=0),
+        cron(send_loan_reminders_cron_task,      hour=9,  minute=0),
+        cron(refresh_exchange_rates_task,        minute=0),
+        cron(purge_inactive_accounts_task,       hour=2,  minute=0),
+        cron(cleanup_notification_dedup_task,    minute=30),
+        cron(purge_expired_refresh_tokens_task,  hour=3,  minute=0),
     ]
 
     on_startup = None

@@ -12,28 +12,15 @@ minversion = "7.0"
 
 # Add options
 addopts = [
-    # Verbose output
     "-v",
-    # Show local variables in tracebacks
     "--tb=short",
-    # Capture stdout/stderr - disable for better async handling
-    "--capture=no",
-    # Coverage reporting
-    "--cov=app",
-    "--cov-report=html:htmlcov",
-    "--cov-report=term-missing",
-    "--cov-report=xml",
-    # Coverage thresholds
-    "--cov-fail-under=80",
-    # Warnings - enable for debugging
+    "--strict-markers",
+    "--asyncio-mode=auto",
     "-W ignore::DeprecationWarning",
     "-W ignore::PendingDeprecationWarning",
-    # Markers
-    "--strict-markers",
-    # Asyncio mode
-    "--asyncio-mode=auto",
-    # Exit after first failure for faster debugging
-    # "--maxfail=1",
+    # Coverage flags are passed explicitly by the test command so they can
+    # be omitted for fast test runs without coverage overhead:
+    #   pytest --cov=app --cov-report=term-missing --cov-fail-under=80
 ]
 
 # Markers

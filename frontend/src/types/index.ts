@@ -6,13 +6,14 @@
 // ── User & Auth ────────────────────────────────────────────────────────
 
 export interface User {
-  readonly id: number
+  readonly id: string           // UUID from backend
   readonly email: string
   readonly name: string | null
   readonly first_name: string | null
   readonly last_name: string | null
   readonly is_active: boolean
   readonly is_verified: boolean
+  readonly is_admin?: boolean   // set by backend; drives RBAC in ProtectedRoute
   readonly two_factor_enabled: boolean
   readonly created_at: string
   readonly updated_at: string
@@ -39,7 +40,7 @@ export interface AuthTokens {
 
 export interface LoginResponse extends AuthTokens {
   readonly requires_2fa?: boolean
-  readonly user_id?: number
+  readonly user_id?: string
   readonly user?: User
 }
 
@@ -62,7 +63,7 @@ export interface TwoFactorVerifyResponse {
 
 export interface FinancialProfile {
   readonly id: number
-  readonly user_id: number
+  readonly user_id: string
   readonly monthly_salary: number | null
   readonly monthly_rent: number | null
   readonly monthly_insurance: number | null
@@ -85,7 +86,7 @@ export type ExpenseCategory =
 
 export interface Expense {
   readonly id: number
-  readonly user_id: number
+  readonly user_id: string
   readonly amount: number
   readonly description: string
   readonly category: ExpenseCategory
@@ -113,7 +114,7 @@ export interface ExpenseFilters {
 
 export interface Budget {
   readonly id: number
-  readonly user_id: number
+  readonly user_id: string
   readonly category: string
   readonly amount: number
   readonly spent: number
@@ -142,7 +143,7 @@ export type GoalStatus = 'active' | 'completed' | 'paused' | 'cancelled'
 
 export interface Goal {
   readonly id: number
-  readonly user_id: number
+  readonly user_id: string
   readonly title: string
   readonly description: string | null
   readonly target_amount: number
@@ -171,7 +172,7 @@ export type LoanStatus = 'active' | 'paid_off' | 'defaulted'
 
 export interface Loan {
   readonly id: number
-  readonly user_id: number
+  readonly user_id: string
   readonly name: string
   readonly principal: number
   readonly interest_rate: number
@@ -215,7 +216,7 @@ export type NotificationType =
 
 export interface Notification {
   readonly id: number
-  readonly user_id: number
+  readonly user_id: string
   readonly title: string
   readonly message: string
   readonly type: NotificationType
@@ -255,7 +256,7 @@ export interface PlatformMetrics {
 
 export interface AuditLogEntry {
   readonly id: number
-  readonly user_id: number
+  readonly user_id: string
   readonly action: string
   readonly details: string
   readonly created_at: string

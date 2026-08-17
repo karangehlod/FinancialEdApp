@@ -28,8 +28,8 @@ class SecurityHeadersMiddleware:
         # Content Security Policy
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline'; "
-            "style-src 'self' 'unsafe-inline'; "
+            "script-src 'self'; "
+            "style-src 'self' 'unsafe-inline'; "  # inline styles needed for UI frameworks
             "img-src 'self' data: https:; "
             "font-src 'self'; "
             "connect-src 'self'; "
@@ -186,31 +186,47 @@ class RequestLoggingMiddleware:
 
 
 class HTTPSEnforcementMiddleware:
-    """Middleware to enforce HTTPS in production."""
-    
+    """Pure-ASGI middleware to enforce HTTPS in production.
+
+    Uses the 3-argument ASGI signature (scope, receive, send) required by
+    Starlette when added via app.add_middleware() directly.
+    """
+
     def __init__(self, app, enabled: bool = True):
         self.app = app
         self.enabled = enabled
-    
-    async def __call__(self, request: Request, call_next: Callable):
-        """Enforce HTTPS."""
-        if not self.enabled:
-            return await call_next(request)
-        
-        # Check if request is HTTPS or has X-Forwarded-Proto
-        is_https = (
-            request.url.scheme == "https" or
-            request.headers.get("x-forwarded-proto") == "https"
-        )
-        
+
+    async def __call__(self, scope, receive, send):
+        if not self.enabled or scope.get("type") != "http":
+            await self.app(scope, receive, send)
+            return
+
+        from starlette.datastructures import URL
+        from starlette.requests import Request as StarletteRequest
+        from starlette.responses import Response
+
+        headers = dict(scope.get("headers", []))
+        forwarded_proto = headers.get(b"x-forwarded-proto", b"").decode()
+        scheme = scope.get("scheme", "http")
+        is_https = scheme == "https" or forwarded_proto == "https"
+
         if not is_https:
-            # Redirect to HTTPS
-            https_url = request.url.replace(scheme="https")
-            return JSONResponse(
-                status_code=status.HTTP_301_MOVED_PERMANENTLY,
-                headers={"location": str(https_url)},
-                content={"detail": "Redirected to HTTPS"}
+            # Build the redirect URL
+            server = scope.get("server") or ("localhost", 80)
+            path = scope.get("path", "/")
+            query = scope.get("query_string", b"").decode()
+            qs = f"?{query}" if query else ""
+            host = headers.get(b"host", f"{server[0]}:{server[1]}".encode()).decode()
+            location = f"https://{host}{path}{qs}"
+            response = Response(
+                status_code=301,
+                headers={"location": location},
+                content=b"Redirecting to HTTPS",
             )
+            await response(scope, receive, send)
+            return
+
+        await self.app(scope, receive, send)
         
         response = await call_next(request)
         return response

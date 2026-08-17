@@ -112,7 +112,7 @@ class LoanRepository(ILoanRepository):
         for field, value in update_fields.items():
             setattr(loan, field, value)
 
-        loan.updated_at = datetime.now(timezone.utc)
+        loan.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         await self._db.flush()
         await self._db.refresh(loan)
         logger.debug("LoanRepository.update_loan: updated loan %s", loan_id)

@@ -87,8 +87,20 @@ export default defineConfig({
       'framer-motion',
       'lucide-react',
       'react-hot-toast',
-      '@tanstack/react-query',
     ],
     exclude: ['chart.js', 'react-chartjs-2'],
+  },
+
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: ['src/__tests__/setup.ts'],
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    exclude: ['node_modules', 'dist'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'lcov'],
+      exclude: ['node_modules/', 'src/__tests__/', '**/*.d.ts'],
+    },
   },
 });

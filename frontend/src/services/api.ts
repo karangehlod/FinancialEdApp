@@ -64,13 +64,15 @@ apiClient.interceptors.response.use(
 
           return apiClient(originalRequest)
         } catch {
+          // Clear tokens — ProtectedRoute detects isAuthenticated=false and redirects to /login
           tokenManager.clearTokens()
-          window.location.href = '/login'
+          // Notify the app without a hard page reload (avoids circular dep with authStore)
+          window.dispatchEvent(new CustomEvent('auth:session-expired'))
           return Promise.reject(error)
         }
       } else {
         tokenManager.clearTokens()
-        window.location.href = '/login'
+        window.dispatchEvent(new CustomEvent('auth:session-expired'))
       }
     }
 

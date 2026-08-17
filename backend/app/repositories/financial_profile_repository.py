@@ -60,7 +60,7 @@ class FinancialProfileRepository:
             if hasattr(profile, field):
                 setattr(profile, field, value)
         
-        profile.updated_at = datetime.now(timezone.utc)
+        profile.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         await self.db.commit()
         await self.db.refresh(profile)
         return profile

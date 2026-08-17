@@ -7,7 +7,6 @@ import { create } from 'zustand'
 import { authService } from '@/services/apiService'
 import tokenManager from '@/utils/tokenManager'
 import logger from '@/utils/logger'
-import { API_BASE_URL } from '@/config/env'
 import axios from 'axios'
 import type { User, LoginCredentials, LoginResponse, RegisterData } from '@/types'
 
@@ -65,12 +64,9 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         logger.info('Access token expired — attempting silent refresh…')
         set({ isLoading: true })
         try {
-          const response = await axios.post<{ access_token: string; refresh_token?: string }>(
-            `${API_BASE_URL}/auth/refresh`,
-            { refresh_token: refreshToken },
-          )
-          const { access_token, refresh_token: newRefresh } = response.data
-          tokenManager.storeToken(access_token, newRefresh ?? refreshToken)
+          // Delegate to authService.refreshToken() — single canonical refresh path
+          const tokens = await authService.refreshToken()
+          tokenManager.storeToken(tokens.access_token, tokens.refresh_token ?? refreshToken)
 
           const user = await authService.getCurrentUser()
           set({ isAuthenticated: true, user, isLoading: false, error: null })

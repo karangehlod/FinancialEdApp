@@ -26,21 +26,19 @@ logger = logging.getLogger(__name__)
 # HTTP Bearer token scheme
 security = HTTPBearer(auto_error=False)
 
-# ---------------------------------------------------------------------------
-# Legacy global for backward compatibility (set during startup)
-# ---------------------------------------------------------------------------
-_redis_cache: Optional[RedisCache] = None
-
-
-def get_redis_cache() -> Optional[RedisCache]:
-    """Return the global Redis cache instance (may be None if Redis is down)."""
-    return _redis_cache
+def get_redis_cache(request: Request) -> Optional[RedisCache]:
+    """Return the Redis cache from app.state (set during lifespan startup)."""
+    return getattr(request.app.state, "redis_cache", None)
 
 
 async def set_redis_cache(cache: Optional[RedisCache]) -> None:
-    """Store the Redis cache instance (called from lifespan startup)."""
-    global _redis_cache
-    _redis_cache = cache
+    """No-op kept for call-site compatibility during lifespan startup.
+
+    The canonical source of truth is app.state.redis_cache, which is
+    set directly in main.py lifespan.  This shim exists only so that
+    the lifespan call ``await set_redis_cache(...)`` does not need to
+    be touched.
+    """
 
 
 # ---------------------------------------------------------------------------

@@ -4,6 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional
 import logging
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.dependencies import get_current_user
 from app.db.session import get_data_db
 from app.schemas.notification import (
@@ -17,6 +19,11 @@ from app.core.logging import get_logger
 logger = get_logger(__name__)
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
+
+def get_notification_service(db: AsyncSession = Depends(get_data_db)) -> NotificationService:
+    """FastAPI dependency — factory for NotificationService."""
+    return NotificationService(db)
+
 
 
 @router.get(
@@ -83,7 +90,7 @@ async def list_notifications(
     }
     ```
     """
-    notification_service = NotificationService(session)
+    notification_service = get_notification_service(db)
 
     notifications, total = await notification_service.get_notifications(
         user_id=str(current_user.id),
@@ -152,7 +159,7 @@ async def get_notification(
     }
     ```
     """
-    notification_service = NotificationService(session)
+    notification_service = get_notification_service(db)
 
     try:
         notification = await notification_service.get_notification(
@@ -214,7 +221,7 @@ async def mark_as_read(
     }
     ```
     """
-    notification_service = NotificationService(session)
+    notification_service = get_notification_service(db)
 
     try:
         notification = await notification_service.mark_as_read(
@@ -255,7 +262,7 @@ async def mark_all_as_read(
     }
     ```
     """
-    notification_service = NotificationService(session)
+    notification_service = get_notification_service(db)
 
     count = await notification_service.mark_all_as_read(user_id=str(current_user.id))
 
@@ -301,7 +308,7 @@ async def delete_notification(
     }
     ```
     """
-    notification_service = NotificationService(session)
+    notification_service = get_notification_service(db)
 
     try:
         await notification_service.delete_notification(
@@ -348,7 +355,7 @@ async def get_notification_summary(
     }
     ```
     """
-    notification_service = NotificationService(session)
+    notification_service = get_notification_service(db)
 
     summary = await notification_service.get_notification_summary(
         user_id=str(current_user.id)
@@ -384,7 +391,7 @@ async def get_unread_count(
     }
     ```
     """
-    notification_service = NotificationService(session)
+    notification_service = get_notification_service(db)
 
     count = await notification_service.get_unread_count(user_id=str(current_user.id))
 

@@ -155,14 +155,14 @@ class FinancialProfileService:
                 )
                 profile.disposable_income = profile.monthly_salary - fixed_expenses
             
-            profile.updated_at = datetime.now(timezone.utc)
+            profile.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
             await self.db.commit()
             await self.db.refresh(profile)
         
         return profile
 
 
-class BudgetService(CRUDService[Budget]):
+class BudgetService(CRUDService):
     """
     Main budget service — orchestrates all budget-related operations.
 

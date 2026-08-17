@@ -1,17 +1,16 @@
 """Base service class providing common functionality for all services."""
 
-from typing import Generic, TypeVar, Optional, List, Any
+from typing import Optional, List, Any
 from abc import ABC, abstractmethod
 import logging
 from datetime import datetime, timezone
 
 from app.core.exceptions import AppException, DatabaseError
 
-T = TypeVar('T')
 logger = logging.getLogger(__name__)
 
 
-class BaseService(ABC, Generic[T]):
+class BaseService(ABC):
     """
     Abstract base service class providing:
     - Common logging functionality
@@ -111,21 +110,16 @@ class BaseService(ABC, Generic[T]):
         
         raise reraise_as(f"Operation '{operation}' failed: {str(error)}")
     
-    @abstractmethod
     async def validate_dependencies(self) -> bool:
         """
         Validate that all service dependencies are available.
-        
-        Raises:
-            AppException: If any dependency is unavailable
-        
-        Returns:
-            True if all dependencies are valid
+        Subclasses may override to add dependency checks.
+        Returns True if all dependencies are valid.
         """
-        pass
+        return True
 
 
-class CRUDService(BaseService[T]):
+class CRUDService(BaseService):
     """
     Base service for CRUD operations.
     
@@ -134,17 +128,17 @@ class CRUDService(BaseService[T]):
     """
     
     @abstractmethod
-    async def create(self, data: Any) -> T:
+    async def create(self, data: Any) -> Any:
         """Create a new resource."""
         pass
     
     @abstractmethod
-    async def read(self, resource_id: Any) -> Optional[T]:
+    async def read(self, resource_id: Any) -> Optional[Any]:
         """Read a resource by ID."""
         pass
     
     @abstractmethod
-    async def update(self, resource_id: Any, data: Any) -> Optional[T]:
+    async def update(self, resource_id: Any, data: Any) -> Optional[Any]:
         """Update a resource."""
         pass
     
@@ -159,7 +153,7 @@ class CRUDService(BaseService[T]):
         skip: int = 0,
         limit: int = 10,
         filters: Optional[dict] = None
-    ) -> List[T]:
+    ) -> List[Any]:
         """List resources with pagination and filtering."""
         pass
 

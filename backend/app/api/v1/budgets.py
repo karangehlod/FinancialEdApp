@@ -28,6 +28,11 @@ from app.services.budget_service import BudgetService
 
 router = APIRouter(prefix="/budgets", tags=["Budget Management"])
 
+def get_budget_service(db: AsyncSession = Depends(get_data_db)) -> BudgetService:
+    """FastAPI dependency — factory for BudgetService."""
+    return BudgetService(db)
+
+
 
 # ============= Summary and Analytics (STATIC ROUTES BEFORE PARAMETRIC) =============
 
@@ -37,7 +42,7 @@ async def get_budget_summary(
     db: AsyncSession = Depends(get_data_db)
 ):
     """Get summary of all budgets for the current user."""
-    service = BudgetService(db)
+    service = get_budget_service(db)
     budgets = await service.get_user_budgets(current_user.id)
     
     total_allocated = sum(float(b.allocated_amount) for b in budgets)
@@ -60,7 +65,7 @@ async def get_budget_alerts(
     db: AsyncSession = Depends(get_data_db)
 ):
     """Get budget alerts for the current user."""
-    service = BudgetService(db)
+    service = get_budget_service(db)
     alerts = await service.get_user_alerts(current_user.id, unread_only)
     # Convert ORM objects to dicts
     alerts_data = [
@@ -105,7 +110,7 @@ async def get_budget_analytics(
     db: AsyncSession = Depends(get_data_db)
 ):
     """Get comprehensive budget analytics for a period."""
-    service = BudgetService(db)
+    service = get_budget_service(db)
     analytics = await service.get_budget_analytics(
         current_user.id, start_date, end_date
     )
@@ -119,7 +124,7 @@ async def mark_alert_as_read(
     db: AsyncSession = Depends(get_data_db)
 ):
     """Mark a budget alert as read."""
-    service = BudgetService(db)
+    service = get_budget_service(db)
     success = await service.mark_alert_as_read(alert_id, current_user.id)
     if not success:
         raise HTTPException(
@@ -204,7 +209,7 @@ async def create_budget(
     )
     
     try:
-        service = BudgetService(db)
+        service = get_budget_service(db)
         budget = await service.create_budget(current_user.id, budget_data)
         logger.info(
             "Budget created successfully",
@@ -265,7 +270,7 @@ async def list_budgets(
         active_only=active_only,
     )
     
-    service = BudgetService(db)
+    service = get_budget_service(db)
     budgets = await service.get_user_budgets(
         current_user.id, start_date, end_date
     )
@@ -403,7 +408,7 @@ async def update_budget(
     )
     
     try:
-        service = BudgetService(db)
+        service = get_budget_service(db)
         budget = await service.update_budget(
             budget_id, current_user.id, budget_data
         )
@@ -461,7 +466,7 @@ async def delete_budget(
         budget_id=str(budget_id),
     )
     
-    service = BudgetService(db)
+    service = get_budget_service(db)
     success = await service.delete_budget(budget_id, current_user.id)
     if not success:
         logger.warning(

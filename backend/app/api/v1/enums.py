@@ -4,7 +4,6 @@ from typing import Dict, List
 from enum import Enum
 
 from app.schemas.loan import LoanType, LoanStatus, PaymentStatus
-from app.services.loan_domain import LoanStatusEnum, PaymentStatusEnum
 from app.core.authorization import Permission, Role
 from app.core.exceptions import ErrorCode
 from app.api.v1.health import HealthStatus
@@ -42,16 +41,6 @@ async def get_loan_statuses():
     }
 
 
-@router.get("/loan-statuses-domain")
-async def get_loan_statuses_domain():
-    """Get all available loan statuses from domain model."""
-    return {
-        "enum_name": "LoanStatusEnum",
-        "values": enum_to_dict(LoanStatusEnum),
-        "values_list": enum_to_list(LoanStatusEnum)
-    }
-
-
 @router.get("/payment-statuses")
 async def get_payment_statuses():
     """Get all available payment statuses."""
@@ -59,16 +48,6 @@ async def get_payment_statuses():
         "enum_name": "PaymentStatus",
         "values": enum_to_dict(PaymentStatus),
         "values_list": enum_to_list(PaymentStatus)
-    }
-
-
-@router.get("/payment-statuses-domain")
-async def get_payment_statuses_domain():
-    """Get all available payment statuses from domain model."""
-    return {
-        "enum_name": "PaymentStatusEnum",
-        "values": enum_to_dict(PaymentStatusEnum),
-        "values_list": enum_to_list(PaymentStatusEnum)
     }
 
 
@@ -178,9 +157,7 @@ async def get_all_enums():
     return {
         "loan_types": enum_to_dict(LoanType),
         "loan_statuses": enum_to_dict(LoanStatus),
-        "loan_statuses_domain": enum_to_dict(LoanStatusEnum),
         "payment_statuses": enum_to_dict(PaymentStatus),
-        "payment_statuses_domain": enum_to_dict(PaymentStatusEnum),
         "goal_types": {
             "SAVINGS": "savings",
             "DEBT_PAYOFF": "debt_payoff",
