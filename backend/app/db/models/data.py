@@ -24,7 +24,7 @@ class UserProfile(DataBase):
 
 class Expense(DataBase):
     __tablename__ = "expenses"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey('user_profiles.user_id', ondelete='CASCADE'), nullable=False)
     amount = Column(Numeric(15, 2), nullable=False)
@@ -36,6 +36,18 @@ class Expense(DataBase):
     payment_method = Column(String(50))
     is_recurring = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=False), server_default=func.now())
+    deleted_at = Column(DateTime(timezone=False), nullable=True)
+
+    @property
+    def is_deleted(self) -> bool:
+        return self.deleted_at is not None
+
+    def soft_delete(self) -> None:
+        from datetime import datetime, timezone
+        self.deleted_at = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    def restore(self) -> None:
+        self.deleted_at = None
 
 
 class Budget(DataBase):
@@ -49,6 +61,18 @@ class Budget(DataBase):
     spent_amount = Column(Numeric(15, 2), default=0)
     recommended_amount = Column(Numeric(15, 2))
     created_at = Column(DateTime(timezone=False), server_default=func.now())
+    deleted_at = Column(DateTime(timezone=False), nullable=True)
+
+    @property
+    def is_deleted(self) -> bool:
+        return self.deleted_at is not None
+
+    def soft_delete(self) -> None:
+        from datetime import datetime, timezone
+        self.deleted_at = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    def restore(self) -> None:
+        self.deleted_at = None
 
 
 class UserFinancialProfile(DataBase):
@@ -98,6 +122,19 @@ class Loan(DataBase):
     description = Column(Text)
     created_at = Column(DateTime(timezone=False), server_default=func.now())
     updated_at = Column(DateTime(timezone=False), server_default=func.now(), onupdate=func.now())
+    deleted_at = Column(DateTime(timezone=False), nullable=True)
+
+    @property
+    def is_deleted(self) -> bool:
+        return self.deleted_at is not None
+
+    def soft_delete(self) -> None:
+        from datetime import datetime, timezone
+        self.deleted_at = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    def restore(self) -> None:
+        self.deleted_at = None
+
 
 
 class LoanPayment(DataBase):
@@ -131,6 +168,18 @@ class Goal(DataBase):
     status = Column(String(20), default='active')  # active, completed, paused, abandoned
     created_at = Column(DateTime(timezone=False), server_default=func.now())
     updated_at = Column(DateTime(timezone=False), server_default=func.now(), onupdate=func.now())
+    deleted_at = Column(DateTime(timezone=False), nullable=True)
+
+    @property
+    def is_deleted(self) -> bool:
+        return self.deleted_at is not None
+
+    def soft_delete(self) -> None:
+        from datetime import datetime, timezone
+        self.deleted_at = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    def restore(self) -> None:
+        self.deleted_at = None
 
 
 class RecurringExpense(DataBase):
@@ -149,6 +198,19 @@ class RecurringExpense(DataBase):
     description = Column(Text)
     created_at = Column(DateTime(timezone=False), server_default=func.now())
     updated_at = Column(DateTime(timezone=False), server_default=func.now(), onupdate=func.now())
+    deleted_at = Column(DateTime(timezone=False), nullable=True)
+
+    @property
+    def is_deleted(self) -> bool:
+        return self.deleted_at is not None
+
+    def soft_delete(self) -> None:
+        from datetime import datetime, timezone
+        self.deleted_at = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    def restore(self) -> None:
+        self.deleted_at = None
+
 
 
 class IncomeSource(DataBase):
@@ -166,6 +228,19 @@ class IncomeSource(DataBase):
     description = Column(Text)
     created_at = Column(DateTime(timezone=False), server_default=func.now())
     updated_at = Column(DateTime(timezone=False), server_default=func.now(), onupdate=func.now())
+    deleted_at = Column(DateTime(timezone=False), nullable=True)
+
+    @property
+    def is_deleted(self) -> bool:
+        return self.deleted_at is not None
+
+    def soft_delete(self) -> None:
+        from datetime import datetime, timezone
+        self.deleted_at = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    def restore(self) -> None:
+        self.deleted_at = None
+
 
 
 class Notification(DataBase):

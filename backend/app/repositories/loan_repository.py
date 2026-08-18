@@ -78,7 +78,7 @@ class LoanRepository(ILoanRepository):
                 and_(Loan.id == loan_id, Loan.user_id == user_id)
             )
         )
-        return result.scalars().first()
+        return result.scalar_one_or_none()
 
     async def get_loans_by_user(
         self,

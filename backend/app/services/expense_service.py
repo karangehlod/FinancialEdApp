@@ -80,7 +80,7 @@ class ExpenseService(BaseService):
                     await self._update_related_budget_spending(new_expense)
             except Exception as budget_exc:
                 logger.warning(
-                    "Budget recalculation failed (expense still saved): %s", budget_exc
+                    f"Budget recalculation failed (expense still saved): {budget_exc}"
                 )
 
             await self.db.commit()

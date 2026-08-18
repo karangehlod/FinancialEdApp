@@ -55,7 +55,7 @@ def loan_create_data() -> LoanCreate:
         interest_rate=Decimal("9.0"),
         loan_term_months=60,
         start_date="2025-01-01",
-        loan_type="personal",
+        loan_type="Personal",
         lender_name="Test Bank",
     )
 

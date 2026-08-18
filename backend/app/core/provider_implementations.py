@@ -128,7 +128,7 @@ class JWTTokenProvider(TokenProvider):
             exp = payload.get("exp")
             if exp is None:
                 return True
-            return datetime.fromtimestamp(exp) < datetime.now(timezone.utc)
+            return datetime.fromtimestamp(exp, tz=timezone.utc) < datetime.now(timezone.utc)
         except Exception:
             return True
 

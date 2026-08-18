@@ -173,6 +173,36 @@ class CacheService:
         return count
 
     # ------------------------------------------------------------------
+    # Versioning helpers (for ETags + cache invalidation)
+    # ------------------------------------------------------------------
+
+    async def bump_version(self, resource: str, user_id: str) -> bool:
+        """Increment the version counter for a resource/user combination."""
+        if not self._enabled or self._cache is None:
+            return False
+        try:
+            redis = getattr(self._cache, 'redis', None) or getattr(self._cache, '_client', None)
+            if redis:
+                await redis.incr(f"version:{resource}:{user_id}")
+            return True
+        except Exception:
+            return False
+
+    async def get_version(self, resource: str, user_id: str) -> int:
+        """Return the current version counter for a resource/user combination (0 if not set)."""
+        if not self._enabled or self._cache is None:
+            return 0
+        try:
+            redis = getattr(self._cache, 'redis', None) or getattr(self._cache, '_client', None)
+            if redis:
+                val = await redis.get(f"version:{resource}:{user_id}")
+                if val is not None:
+                    return int(val)
+        except Exception:
+            pass
+        return 0
+
+    # ------------------------------------------------------------------
     # Cache-aside helper
     # ------------------------------------------------------------------
 

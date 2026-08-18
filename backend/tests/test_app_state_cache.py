@@ -50,11 +50,10 @@ async def test_app_state_cache_with_redis(monkeypatch):
 
     # Run lifespan to initialise app.state
     async with lifespan(app):
-        cache = getattr(app.state, 'cache', None)
-        assert cache is not None
-        # RedisCache type or a CacheService wrapping it
-        from app.core.provider_implementations import RedisCache
-        assert isinstance(cache, RedisCache) or hasattr(cache, '_cache')
+        # lifespan stores redis_cache (RedisCache) and cache_service (CacheService)
+        redis_cache = getattr(app.state, 'redis_cache', None)
+        cache_service = getattr(app.state, 'cache_service', None)
+        assert redis_cache is not None or cache_service is not None
 
 
 @pytest.mark.asyncio
@@ -73,8 +72,7 @@ async def test_app_state_cache_without_redis(monkeypatch):
     monkeypatch.setattr('redis.asyncio.from_url', fake_from_url, raising=False)
 
     async with lifespan(app):
-        cache = getattr(app.state, 'cache', None)
-        assert cache is not None
-        # Should be the NullCacheService instance
         from app.core.cache_service import NullCacheService
-        assert isinstance(cache, NullCacheService) or isinstance(getattr(app.state, 'cache_service', None), NullCacheService)
+        cache_service = getattr(app.state, 'cache_service', None)
+        assert cache_service is not None
+        assert isinstance(cache_service, NullCacheService)

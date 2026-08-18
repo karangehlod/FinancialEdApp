@@ -34,8 +34,15 @@ def _make_expense(user_id=None, category="food", amount=Decimal("50.00"), expens
 
 
 def _make_db():
-    """Return a mock AsyncSession."""
+    """Return a mock AsyncSession with begin_nested as an async context manager."""
     db = AsyncMock()
+    # begin_nested() must return an async context manager, not a coroutine
+    db.begin_nested = MagicMock(
+        return_value=AsyncMock(
+            __aenter__=AsyncMock(return_value=None),
+            __aexit__=AsyncMock(return_value=False),
+        )
+    )
     return db
 
 
@@ -103,7 +110,7 @@ async def test_create_expense_commits_transaction():
 
 @pytest.mark.asyncio
 async def test_create_expense_rollback_on_budget_failure():
-    """If budget update fails, the transaction is rolled back (expense not persisted)."""
+    """Budget update failure is non-fatal (savepoint); expense is still created (P1-7)."""
     db = _make_db()
     expense = _make_expense()
 
@@ -113,16 +120,17 @@ async def test_create_expense_rollback_on_budget_failure():
     svc._update_related_budget_spending = AsyncMock(side_effect=Exception("DB error"))
     svc._invalidate_expense_cache = AsyncMock()
 
-    with pytest.raises(DatabaseError):
-        await svc.create_expense(
-            user_id=expense.user_id,
-            expense_data=MagicMock(amount=Decimal("50"), date=date.today()),
-        )
+    # With savepoints, budget failure does NOT roll back the expense
+    result = await svc.create_expense(
+        user_id=expense.user_id,
+        expense_data=MagicMock(amount=Decimal("50"), date=date.today()),
+    )
 
-    # Rollback should be called
-    db.rollback.assert_called_once()
-    # Cache should NOT be invalidated on failure
-    svc._invalidate_expense_cache.assert_not_called()
+    # Expense IS still committed despite budget failure
+    db.commit.assert_called_once()
+    # Cache IS invalidated for the expense
+    svc._invalidate_expense_cache.assert_called_once_with(expense.user_id)
+    assert result == expense
 
 
 # ---------------------------------------------------------------------------

@@ -133,3 +133,26 @@ def client(api_user, api_token, _api_auth_db, _api_data_db):
 
     for dep in [get_current_user, get_auth_db, get_data_db, get_redis_cache]:
         app.dependency_overrides.pop(dep, None)
+
+
+@pytest.fixture(scope="function")
+def unauth_client(_api_auth_db, _api_data_db):
+    """TestClient WITHOUT get_current_user override — used to test auth failure responses."""
+    mock_cache = _make_mock_cache()
+
+    async def _override_auth_db():
+        yield _api_auth_db
+
+    async def _override_data_db():
+        yield _api_data_db
+
+    app.dependency_overrides[get_auth_db] = _override_auth_db
+    app.dependency_overrides[get_data_db] = _override_data_db
+    app.dependency_overrides[get_redis_cache] = lambda: mock_cache
+
+    test_client = TestClient(app, raise_server_exceptions=False)
+
+    yield test_client
+
+    for dep in [get_auth_db, get_data_db, get_redis_cache]:
+        app.dependency_overrides.pop(dep, None)
