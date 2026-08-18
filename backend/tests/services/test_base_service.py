@@ -252,49 +252,41 @@ class TestCRUDService:
 
 
 class TestServiceFactory:
-    """Test ServiceFactory."""
-    
+    """Test ServiceFactory — now instance-based (not class-method based)."""
+
     def test_factory_register_service(self):
-        # Clear previous registrations
-        ServiceFactory._services = {}
-        
-        ServiceFactory.register_service("test_service", ConcreteCRUDService)
-        assert "test_service" in ServiceFactory._services
+        factory = ServiceFactory()
+        factory.register_service("test_service", ConcreteCRUDService)
+        assert "test_service" in factory._services
 
     def test_factory_get_service(self):
-        ServiceFactory._services = {}
-        ServiceFactory.register_service("test_service", ConcreteCRUDService)
-        
-        service = ServiceFactory.get_service("test_service")
+        factory = ServiceFactory()
+        factory.register_service("test_service", ConcreteCRUDService)
+        service = factory.get_service("test_service")
         assert isinstance(service, ConcreteCRUDService)
 
     def test_factory_get_unregistered_service_raises_error(self):
-        ServiceFactory._services = {}
-        
+        factory = ServiceFactory()
         with pytest.raises(ValueError, match="not registered"):
-            ServiceFactory.get_service("non_existent_service")
+            factory.get_service("non_existent_service")
 
     def test_factory_create_service_instance(self):
-        service = ServiceFactory.create_service_instance(ConcreteCRUDService)
+        factory = ServiceFactory()
+        service = factory.create_service_instance(ConcreteCRUDService)
         assert isinstance(service, ConcreteCRUDService)
 
     def test_factory_multiple_registrations(self):
-        ServiceFactory._services = {}
-        
-        ServiceFactory.register_service("service1", ConcreteBaseService)
-        ServiceFactory.register_service("service2", ConcreteCRUDService)
-        
-        service1 = ServiceFactory.get_service("service1")
-        service2 = ServiceFactory.get_service("service2")
-        
+        factory = ServiceFactory()
+        factory.register_service("service1", ConcreteBaseService)
+        factory.register_service("service2", ConcreteCRUDService)
+        service1 = factory.get_service("service1")
+        service2 = factory.get_service("service2")
         assert isinstance(service1, ConcreteBaseService)
         assert isinstance(service2, ConcreteCRUDService)
 
     def test_factory_overwrite_existing_registration(self):
-        ServiceFactory._services = {}
-        
-        ServiceFactory.register_service("service", ConcreteBaseService)
-        assert ServiceFactory.get_service("service").__class__.__name__ == "ConcreteBaseService"
-        
-        ServiceFactory.register_service("service", ConcreteCRUDService)
-        assert ServiceFactory.get_service("service").__class__.__name__ == "ConcreteCRUDService"
+        factory = ServiceFactory()
+        factory.register_service("service", ConcreteBaseService)
+        assert factory.get_service("service").__class__.__name__ == "ConcreteBaseService"
+        factory.register_service("service", ConcreteCRUDService)
+        assert factory.get_service("service").__class__.__name__ == "ConcreteCRUDService"

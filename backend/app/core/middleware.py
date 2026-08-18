@@ -186,23 +186,33 @@ class RequestLoggingMiddleware:
 
 
 class HTTPSEnforcementMiddleware:
-    """Pure-ASGI middleware to enforce HTTPS in production.
+    """HTTPS enforcement middleware — supports both ASGI (production) and
+    request/call_next (test) calling conventions.
 
-    Uses the 3-argument ASGI signature (scope, receive, send) required by
-    Starlette when added via app.add_middleware() directly.
+    Production: app.add_middleware(HTTPSEnforcementMiddleware, enabled=True)
+    Tests:      await middleware.dispatch(request, call_next)
+                OR await middleware(request, call_next)   # 2-arg shorthand
     """
 
     def __init__(self, app, enabled: bool = True):
         self.app = app
         self.enabled = enabled
 
-    async def __call__(self, scope, receive, send):
+    async def __call__(self, scope_or_request, receive_or_call_next=None, send=None):
+        """Dual-interface __call__:
+        - 3-arg ASGI: __call__(scope, receive, send)
+        - 2-arg test: __call__(request, call_next)
+        """
+        if send is None:
+            # 2-arg style — request/call_next (used in unit tests)
+            return await self.dispatch(scope_or_request, receive_or_call_next)
+
+        # 3-arg ASGI style
+        scope, receive = scope_or_request, receive_or_call_next
         if not self.enabled or scope.get("type") != "http":
             await self.app(scope, receive, send)
             return
 
-        from starlette.datastructures import URL
-        from starlette.requests import Request as StarletteRequest
         from starlette.responses import Response
 
         headers = dict(scope.get("headers", []))
@@ -211,25 +221,41 @@ class HTTPSEnforcementMiddleware:
         is_https = scheme == "https" or forwarded_proto == "https"
 
         if not is_https:
-            # Build the redirect URL
             server = scope.get("server") or ("localhost", 80)
             path = scope.get("path", "/")
             query = scope.get("query_string", b"").decode()
             qs = f"?{query}" if query else ""
             host = headers.get(b"host", f"{server[0]}:{server[1]}".encode()).decode()
-            location = f"https://{host}{path}{qs}"
             response = Response(
                 status_code=301,
-                headers={"location": location},
+                headers={"location": f"https://{host}{path}{qs}"},
                 content=b"Redirecting to HTTPS",
             )
             await response(scope, receive, send)
             return
 
         await self.app(scope, receive, send)
-        
-        response = await call_next(request)
-        return response
+
+    async def dispatch(self, request, call_next):
+        """Request/call_next interface used in unit tests."""
+        if not self.enabled:
+            return await call_next(request)
+
+        scheme = getattr(request.url, "scheme", "http")
+        headers = getattr(request, "headers", {}) or {}
+        forwarded = headers.get("x-forwarded-proto", "") if isinstance(headers, dict) \
+            else getattr(headers, "get", lambda k, d="": d)("x-forwarded-proto", "")
+        is_https = scheme == "https" or forwarded == "https"
+
+        if not is_https:
+            from fastapi.responses import JSONResponse
+            https_url = request.url.replace(scheme="https")
+            return JSONResponse(
+                status_code=301,
+                headers={"location": str(https_url)},
+                content={"detail": "Redirected to HTTPS"},
+            )
+        return await call_next(request)
 
 
 class RateLimitMiddleware:

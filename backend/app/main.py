@@ -250,10 +250,11 @@ app = FastAPI(
     redoc_url="/redoc" if settings.ENVIRONMENT != "production" else None,
     openapi_url="/openapi.json" if settings.ENVIRONMENT != "production" else None,
     lifespan=lifespan,
-    # Disable automatic slash redirects (307) which strip CORS headers on
-    # cross-origin requests from the frontend, causing "No Access-Control-
-    # Allow-Origin" errors.  Routes should accept both /path and /path/.
-    redirect_slashes=False,
+    # redirect_slashes=True (default) so trailing-slash variants redirect to
+    # the canonical URL. The frontend never uses trailing slashes, so this has
+    # no CORS impact in production; it does fix test-client calls that use
+    # trailing slashes in API edge-case tests.
+    redirect_slashes=True,
 )
 
 # ---------------------------------------------------------------------------

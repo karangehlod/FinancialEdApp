@@ -26,19 +26,30 @@ logger = logging.getLogger(__name__)
 # HTTP Bearer token scheme
 security = HTTPBearer(auto_error=False)
 
-def get_redis_cache(request: Request) -> Optional[RedisCache]:
-    """Return the Redis cache from app.state (set during lifespan startup)."""
-    return getattr(request.app.state, "redis_cache", None)
+# Module-level cache reference — used as fallback when no Request is available
+# (e.g. direct calls in unit tests).  Production code uses app.state.redis_cache
+# via the request-based path below.
+_redis_cache: Optional[RedisCache] = None
+
+
+def get_redis_cache(request: Optional[Request] = None) -> Optional[RedisCache]:
+    """Return the Redis cache.
+
+    When injected via FastAPI Depends(), the request is provided automatically
+    and the app.state cache takes priority.  When called directly (e.g. in unit
+    tests), falls back to the module-level _redis_cache set by set_redis_cache.
+    """
+    if request is not None:
+        state_cache = getattr(request.app.state, "redis_cache", None)
+        if state_cache is not None:
+            return state_cache
+    return _redis_cache
 
 
 async def set_redis_cache(cache: Optional[RedisCache]) -> None:
-    """No-op kept for call-site compatibility during lifespan startup.
-
-    The canonical source of truth is app.state.redis_cache, which is
-    set directly in main.py lifespan.  This shim exists only so that
-    the lifespan call ``await set_redis_cache(...)`` does not need to
-    be touched.
-    """
+    """Store a Redis cache instance — called from lifespan startup and tests."""
+    global _redis_cache
+    _redis_cache = cache
 
 
 # ---------------------------------------------------------------------------

@@ -90,7 +90,7 @@ async def list_notifications(
     }
     ```
     """
-    notification_service = get_notification_service(db)
+    notification_service = get_notification_service(session)
 
     notifications, total = await notification_service.get_notifications(
         user_id=str(current_user.id),
@@ -159,7 +159,7 @@ async def get_notification(
     }
     ```
     """
-    notification_service = get_notification_service(db)
+    notification_service = get_notification_service(session)
 
     try:
         notification = await notification_service.get_notification(
@@ -221,7 +221,7 @@ async def mark_as_read(
     }
     ```
     """
-    notification_service = get_notification_service(db)
+    notification_service = get_notification_service(session)
 
     try:
         notification = await notification_service.mark_as_read(
@@ -262,7 +262,7 @@ async def mark_all_as_read(
     }
     ```
     """
-    notification_service = get_notification_service(db)
+    notification_service = get_notification_service(session)
 
     count = await notification_service.mark_all_as_read(user_id=str(current_user.id))
 
@@ -308,7 +308,7 @@ async def delete_notification(
     }
     ```
     """
-    notification_service = get_notification_service(db)
+    notification_service = get_notification_service(session)
 
     try:
         await notification_service.delete_notification(
@@ -355,7 +355,7 @@ async def get_notification_summary(
     }
     ```
     """
-    notification_service = get_notification_service(db)
+    notification_service = get_notification_service(session)
 
     summary = await notification_service.get_notification_summary(
         user_id=str(current_user.id)
@@ -391,7 +391,7 @@ async def get_unread_count(
     }
     ```
     """
-    notification_service = get_notification_service(db)
+    notification_service = get_notification_service(session)
 
     count = await notification_service.get_unread_count(user_id=str(current_user.id))
 
