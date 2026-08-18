@@ -32,17 +32,13 @@ security = HTTPBearer(auto_error=False)
 _redis_cache: Optional[RedisCache] = None
 
 
-def get_redis_cache(request: Optional[Request] = None) -> Optional[RedisCache]:
-    """Return the Redis cache.
+def get_redis_cache() -> Optional[RedisCache]:
+    """Return the current Redis cache instance (None if Redis is unavailable).
 
-    When injected via FastAPI Depends(), the request is provided automatically
-    and the app.state cache takes priority.  When called directly (e.g. in unit
-    tests), falls back to the module-level _redis_cache set by set_redis_cache.
+    Can be called directly (tests) or used as FastAPI Depends() — no Request
+    parameter needed because the cache is stored as a module-level global that
+    lifespan startup sets via set_redis_cache().
     """
-    if request is not None:
-        state_cache = getattr(request.app.state, "redis_cache", None)
-        if state_cache is not None:
-            return state_cache
     return _redis_cache
 
 
