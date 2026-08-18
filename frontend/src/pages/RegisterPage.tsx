@@ -1,15 +1,10 @@
-/**
- * RegisterPage — matching two-column layout to LoginPage.
- * Left: brand panel (lg+). Right: registration form.
- * Pure Tailwind — no custom CSS classes.
- */
-
 import React, { useState, useCallback, type FormEvent, type ChangeEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Lock, Mail, Eye, EyeOff, AlertCircle, User, ChevronRight,
-  TrendingUp, PiggyBank, Target, BarChart2,
+  TrendingUp, PiggyBank, Target, BarChart2, Bell, MessageSquare,
+  Shield, Zap, FileDown, RefreshCw,
 } from 'lucide-react'
 
 import FinEdLogo from '../assets/FinEdLogo.png'
@@ -17,19 +12,19 @@ import { useAuthStore } from '@/store/authStore'
 import OAuthButtons from '@/components/OAuthButtons'
 import { showSuccessToast, showErrorToast } from '@/utils/toast'
 import { validateEmail } from '@/utils/helpers'
+import { Footer } from '@/components/Footer'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
 interface RegisterForm {
   first_name: string
-  last_name: string
-  email: string
-  password: string
-  confirm: string
+  last_name:  string
+  email:      string
+  password:   string
+  confirm:    string
 }
 
 type FormErrors = Partial<Record<keyof RegisterForm, string>>
-
 type PasswordStrength = 0 | 1 | 2 | 3 | 4
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -37,10 +32,10 @@ type PasswordStrength = 0 | 1 | 2 | 3 | 4
 const getStrength = (pw: string): PasswordStrength => {
   if (!pw) return 0
   let s = 0
-  if (pw.length >= 8)                              s++
-  if (/[a-z]/.test(pw) && /[A-Z]/.test(pw))       s++
-  if (/\d/.test(pw))                               s++
-  if (/[!@#$%^&*]/.test(pw))                       s++
+  if (pw.length >= 8)                        s++
+  if (/[a-z]/.test(pw) && /[A-Z]/.test(pw)) s++
+  if (/\d/.test(pw))                         s++
+  if (/[!@#$%^&*]/.test(pw))                s++
   return s as PasswordStrength
 }
 
@@ -52,25 +47,31 @@ const strengthLabels: Record<PasswordStrength, { label: string; color: string }>
   4: { label: 'Strong', color: 'bg-emerald-500' },
 }
 
-const STATS = [
-  { icon: TrendingUp, value: '50K+',  label: 'Users' },
-  { icon: PiggyBank,  value: '₹10Cr+', label: 'Tracked' },
-  { icon: Target,     value: '95%',   label: 'Goal Hit Rate' },
-  { icon: BarChart2,  value: '4.9★',  label: 'Rating' },
+const FEATURES = [
+  { icon: TrendingUp,    label: 'Expense Tracking & Categorisation' },
+  { icon: PiggyBank,     label: 'Monthly Budget Management' },
+  { icon: Target,        label: 'Savings Goals with Progress Tracking' },
+  { icon: Zap,           label: 'Loan Management & EMI Calculator' },
+  { icon: BarChart2,     label: 'Financial Reports & Analytics' },
+  { icon: Bell,          label: 'Smart Budget & Goal Alerts' },
+  { icon: MessageSquare, label: 'AI-Powered Financial Assistant' },
+  { icon: Shield,        label: 'Two-Factor Authentication (2FA)' },
+  { icon: RefreshCw,     label: 'Multi-Currency Support' },
+  { icon: FileDown,      label: 'CSV / JSON Data Export' },
 ]
 
 // ── Component ──────────────────────────────────────────────────────────────
 
 export const RegisterPage: React.FC = () => {
-  const navigate  = useNavigate()
+  const navigate = useNavigate()
   const { register, isLoading, error, clearError } = useAuthStore()
 
-  const [form, setForm]       = useState<RegisterForm>({
+  const [form, setForm]     = useState<RegisterForm>({
     first_name: '', last_name: '', email: '', password: '', confirm: '',
   })
-  const [errors, setErrors]   = useState<FormErrors>({})
-  const [showPw, setShowPw]   = useState(false)
-  const [showCf, setShowCf]   = useState(false)
+  const [errors, setErrors] = useState<FormErrors>({})
+  const [showPw, setShowPw] = useState(false)
+  const [showCf, setShowCf] = useState(false)
 
   const strength = getStrength(form.password)
   const sInfo    = strengthLabels[strength]
@@ -91,7 +92,7 @@ export const RegisterPage: React.FC = () => {
     if (!form.email)             errs.email      = 'Email is required'
     else if (!validateEmail(form.email)) errs.email = 'Invalid email format'
     if (!form.password)          errs.password   = 'Password is required'
-    else if (form.password.length < 8) errs.password = 'Minimum 8 characters'
+    else if (form.password.length < 8)  errs.password = 'Minimum 8 characters'
     if (form.confirm !== form.password) errs.confirm = 'Passwords do not match'
     return errs
   }, [form])
@@ -101,7 +102,6 @@ export const RegisterPage: React.FC = () => {
     clearError()
     const errs = validate()
     if (Object.keys(errs).length > 0) { setErrors(errs); return }
-
     try {
       await register({
         first_name: form.first_name.trim(),
@@ -116,276 +116,280 @@ export const RegisterPage: React.FC = () => {
     }
   }, [form, validate, register, error, clearError, navigate])
 
-  // ── Input class builder ────────────────────────────────────────────────
-
   const inp = (field: keyof RegisterForm) => `
     w-full pl-10 pr-4 py-2.5 rounded-xl border text-sm transition
     bg-white dark:bg-gray-800 text-gray-900 dark:text-white
-    focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500
+    focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500
     ${errors[field]
       ? 'border-red-400 dark:border-red-600'
       : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'}
   `
 
-  // ── Render ─────────────────────────────────────────────────────────────
-
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row bg-gray-50 dark:bg-gray-950">
+    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-950">
 
-      {/* ── Left panel (lg+) ──────────────────────────────────────────── */}
-      <div className="hidden lg:flex lg:w-[44%] xl:w-2/5 flex-col justify-between
-                      bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-700
-                      p-10 xl:p-14 text-white flex-shrink-0">
-
-        {/* Brand */}
-        <div className="flex items-center gap-3">
-          <img src={FinEdLogo} alt="FinEd" className="w-10 h-10 rounded-xl object-contain" />
-          <div>
-            <p className="font-bold text-lg leading-tight">FinEd</p>
-            <p className="text-emerald-200 text-sm leading-tight">Master Your Financial Future</p>
-          </div>
+      {/* ── Page Header ─────────────────────────────────────────────────── */}
+      <header className="flex-shrink-0 flex items-center gap-3 px-6 py-4
+                         bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800
+                         shadow-sm">
+        <img src={FinEdLogo} alt="FinEd" className="w-10 h-10 rounded-xl object-contain" />
+        <div>
+          <span className="font-bold text-lg text-gray-900 dark:text-white leading-tight block">FinEd</span>
+          <span className="text-xs text-gray-500 dark:text-gray-400 leading-tight">Master Your Financial Future</span>
         </div>
+      </header>
 
-        {/* Hero copy */}
-        <div className="space-y-8">
-          <div>
-            <h2 className="text-3xl xl:text-4xl font-extrabold leading-tight">
-              Your financial journey<br />starts here. Free.
-            </h2>
-            <p className="mt-3 text-emerald-100 text-base leading-relaxed max-w-xs">
-              Join thousands of users who have already transformed their finances with FinEd.
-            </p>
-          </div>
-
-          {/* Stats grid */}
-          <div className="grid grid-cols-2 gap-4">
-            {STATS.map(({ icon: Icon, value, label }) => (
-              <div key={label}
-                className="bg-white/10 rounded-2xl p-4 flex flex-col gap-1 backdrop-blur-sm">
-                <Icon size={20} className="text-emerald-200" />
-                <p className="text-2xl font-extrabold">{value}</p>
-                <p className="text-xs text-emerald-200">{label}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Testimonial */}
-          <blockquote className="border-l-2 border-emerald-300 pl-4 italic text-sm text-emerald-100">
-            "FinEd helped me save ₹2 lakh in under 6 months by showing me exactly where my money was going."
-            <footer className="mt-1 not-italic text-emerald-300 text-xs">— Priya, Bangalore</footer>
-          </blockquote>
-        </div>
-
-        <p className="text-emerald-300 text-xs">
-          © {new Date().getFullYear()} FinancialEdApp. Your data stays private.
-        </p>
-      </div>
-
-      {/* ── Right panel — form ─────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col items-center justify-center
-                      px-5 py-10 sm:px-8 lg:px-12 xl:px-16">
-
-        {/* Mobile brand */}
-        <div className="lg:hidden flex flex-col items-center gap-2 mb-8">
-          <img src={FinEdLogo} alt="FinEd" className="w-14 h-14 rounded-2xl object-contain" />
-          <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white">FinEd</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Master Your Financial Future</p>
-        </div>
-
-        {/* Card */}
+      {/* ── Main ────────────────────────────────────────────────────────── */}
+      <main className="flex-1 flex items-start justify-center px-4 py-8 sm:py-12">
         <motion.div
-          className="w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-xl
-                     border border-gray-100 dark:border-gray-800 p-8 sm:p-10"
+          className="w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden
+                     border border-gray-200 dark:border-gray-800
+                     flex flex-col lg:flex-row"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35 }}
         >
-          <div className="mb-7">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Create your account</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Free forever. No credit card required.
-            </p>
-          </div>
 
-          {/* Global error */}
-          {error && (
-            <motion.div
-              className="flex items-start gap-2 p-3 mb-5 rounded-xl
-                         bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-sm"
-              initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
-            >
-              <AlertCircle size={15} className="text-red-500 mt-0.5 flex-shrink-0" />
-              <span className="text-red-700 dark:text-red-400 flex-1">{error}</span>
-              <button onClick={clearError} className="ml-auto text-red-500 font-bold text-base leading-none">×</button>
-            </motion.div>
-          )}
+          {/* ── Left panel — brand + features ──────────────────────────── */}
+          <div className="lg:w-[42%] flex-shrink-0 flex flex-col
+                          bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-700
+                          p-8 xl:p-10 text-white">
 
-          <form onSubmit={handleSubmit} noValidate className="space-y-4">
+            {/* Brand */}
+            <div className="flex items-center gap-4 mb-8">
+              <img
+                src={FinEdLogo}
+                alt="FinEd logo"
+                className="w-16 h-16 rounded-2xl object-contain bg-white/10 p-1 shadow-lg"
+              />
+              <div>
+                <p className="font-extrabold text-2xl leading-tight">FinEd</p>
+                <p className="text-emerald-200 text-sm leading-tight">Master Your Financial Future</p>
+              </div>
+            </div>
 
-            {/* Name row */}
-            <div className="grid grid-cols-2 gap-3">
-              {(['first_name', 'last_name'] as const).map((field) => (
-                <div key={field}>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    {field === 'first_name' ? 'First name' : 'Last name'}
-                  </label>
-                  <div className="relative">
-                    <User size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input
-                      type="text"
-                      autoComplete={field === 'first_name' ? 'given-name' : 'family-name'}
-                      placeholder={field === 'first_name' ? 'Karan' : 'Gehlod'}
-                      value={form[field]}
-                      onChange={setField(field)}
-                      className={inp(field)}
-                    />
-                  </div>
-                  {errors[field] && (
-                    <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
-                      <AlertCircle size={11} />{errors[field]}
-                    </p>
-                  )}
-                </div>
+            {/* Headline */}
+            <div className="mb-6">
+              <h2 className="text-2xl xl:text-3xl font-extrabold leading-snug">
+                Everything you need to manage your money — in one place.
+              </h2>
+              <p className="mt-3 text-emerald-100 text-sm leading-relaxed">
+                Track expenses, plan budgets, hit savings goals, and get AI-powered insights.
+                All your financial data, private and secure.
+              </p>
+            </div>
+
+            {/* Features — real capabilities only */}
+            <ul className="space-y-2.5 flex-1">
+              {FEATURES.map(({ icon: Icon, label }) => (
+                <li key={label} className="flex items-center gap-3 text-sm">
+                  <span className="flex-shrink-0 w-7 h-7 rounded-lg bg-white/15 flex items-center justify-center">
+                    <Icon size={14} />
+                  </span>
+                  <span className="text-emerald-50">{label}</span>
+                </li>
               ))}
-            </div>
+            </ul>
 
-            {/* Email */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                Email Address
-              </label>
-              <div className="relative">
-                <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="email"
-                  autoComplete="email"
-                  placeholder="you@example.com"
-                  value={form.email}
-                  onChange={setField('email')}
-                  className={inp('email')}
-                />
-              </div>
-              {errors.email && (
-                <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
-                  <AlertCircle size={11} />{errors.email}
-                </p>
-              )}
-            </div>
-
-            {/* Password */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                Password
-              </label>
-              <div className="relative">
-                <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  type={showPw ? 'text' : 'password'}
-                  autoComplete="new-password"
-                  placeholder="Min 8 characters"
-                  value={form.password}
-                  onChange={setField('password')}
-                  className={`${inp('password')} pr-11`}
-                />
-                <button type="button" tabIndex={-1} onClick={() => setShowPw(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                  {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
-                </button>
-              </div>
-              {/* Strength bar */}
-              {form.password && (
-                <div className="mt-2 space-y-1">
-                  <div className="flex gap-1">
-                    {([1, 2, 3, 4] as const).map(n => (
-                      <div key={n}
-                        className={`h-1 flex-1 rounded-full transition-all duration-300
-                                    ${n <= strength ? sInfo.color : 'bg-gray-200 dark:bg-gray-700'}`} />
-                    ))}
-                  </div>
-                  {sInfo.label && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Strength: <span className="font-medium">{sInfo.label}</span>
-                    </p>
-                  )}
-                </div>
-              )}
-              {errors.password && (
-                <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
-                  <AlertCircle size={11} />{errors.password}
-                </p>
-              )}
-            </div>
-
-            {/* Confirm password */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                Confirm Password
-              </label>
-              <div className="relative">
-                <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  type={showCf ? 'text' : 'password'}
-                  autoComplete="new-password"
-                  placeholder="Re-enter your password"
-                  value={form.confirm}
-                  onChange={setField('confirm')}
-                  className={`${inp('confirm')} pr-11`}
-                />
-                <button type="button" tabIndex={-1} onClick={() => setShowCf(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                  {showCf ? <EyeOff size={15} /> : <Eye size={15} />}
-                </button>
-              </div>
-              {errors.confirm && (
-                <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
-                  <AlertCircle size={11} />{errors.confirm}
-                </p>
-              )}
-            </div>
-
-            {/* Terms */}
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              By creating an account you agree to our{' '}
-              <Link to="/terms" className="text-indigo-600 dark:text-indigo-400 hover:underline">Terms</Link>
-              {' '}and{' '}
-              <Link to="/privacy" className="text-indigo-600 dark:text-indigo-400 hover:underline">Privacy Policy</Link>.
+            <p className="mt-8 text-emerald-300 text-xs">
+              © {new Date().getFullYear()} FinancialEdApp · Built by Karan Gehlod
             </p>
-
-            {/* Submit */}
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60
-                         text-white font-semibold text-sm flex items-center justify-center gap-2 transition"
-            >
-              {isLoading ? (
-                <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-              ) : (
-                <>Create Free Account <ChevronRight size={15} /></>
-              )}
-            </button>
-          </form>
-
-          {/* Divider + OAuth */}
-          <div className="flex items-center gap-3 my-5">
-            <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
-            <span className="text-xs text-gray-400">or sign up with</span>
-            <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
           </div>
 
-          <OAuthButtons
-            onSuccess={() => { showSuccessToast('Signed up!'); navigate('/dashboard') }}
-            onError={(msg) => showErrorToast(msg ?? 'OAuth signup failed')}
-          />
+          {/* ── Right panel — registration form ────────────────────────── */}
+          <div className="flex-1 bg-white dark:bg-gray-900 flex flex-col justify-center
+                          px-6 py-8 sm:px-10 xl:px-12">
 
-          <p className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
-            Already have an account?{' '}
-            <Link to="/login" className="text-indigo-600 dark:text-indigo-400 font-semibold hover:underline">
-              Sign in
-            </Link>
-          </p>
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Create your account</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                Free to use · No credit card required
+              </p>
+            </div>
+
+            {/* Global error */}
+            {error && (
+              <motion.div
+                className="flex items-start gap-2 p-3 mb-5 rounded-xl
+                           bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-sm"
+                initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
+              >
+                <AlertCircle size={15} className="text-red-500 mt-0.5 flex-shrink-0" />
+                <span className="text-red-700 dark:text-red-400 flex-1">{error}</span>
+                <button onClick={clearError} className="ml-auto text-red-500 font-bold text-base leading-none">×</button>
+              </motion.div>
+            )}
+
+            <form onSubmit={handleSubmit} noValidate className="space-y-4">
+
+              {/* Name row */}
+              <div className="grid grid-cols-2 gap-3">
+                {(['first_name', 'last_name'] as const).map((field) => (
+                  <div key={field}>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      {field === 'first_name' ? 'First name' : 'Last name'}
+                    </label>
+                    <div className="relative">
+                      <User size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="text"
+                        autoComplete={field === 'first_name' ? 'given-name' : 'family-name'}
+                        placeholder={field === 'first_name' ? 'First' : 'Last'}
+                        value={form[field]}
+                        onChange={setField(field)}
+                        className={inp(field)}
+                      />
+                    </div>
+                    {errors[field] && (
+                      <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
+                        <AlertCircle size={11} />{errors[field]}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Email */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                  Email Address
+                </label>
+                <div className="relative">
+                  <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="email"
+                    autoComplete="email"
+                    placeholder="you@example.com"
+                    value={form.email}
+                    onChange={setField('email')}
+                    className={inp('email')}
+                  />
+                </div>
+                {errors.email && (
+                  <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
+                    <AlertCircle size={11} />{errors.email}
+                  </p>
+                )}
+              </div>
+
+              {/* Password */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                  Password
+                </label>
+                <div className="relative">
+                  <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type={showPw ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    placeholder="Min 8 characters"
+                    value={form.password}
+                    onChange={setField('password')}
+                    className={`${inp('password')} pr-11`}
+                  />
+                  <button type="button" tabIndex={-1} onClick={() => setShowPw(v => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
+                {form.password && (
+                  <div className="mt-2 space-y-1">
+                    <div className="flex gap-1">
+                      {([1, 2, 3, 4] as const).map(n => (
+                        <div key={n}
+                          className={`h-1 flex-1 rounded-full transition-all duration-300
+                                      ${n <= strength ? sInfo.color : 'bg-gray-200 dark:bg-gray-700'}`} />
+                      ))}
+                    </div>
+                    {sInfo.label && (
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Strength: <span className="font-medium">{sInfo.label}</span>
+                      </p>
+                    )}
+                  </div>
+                )}
+                {errors.password && (
+                  <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
+                    <AlertCircle size={11} />{errors.password}
+                  </p>
+                )}
+              </div>
+
+              {/* Confirm password */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                  Confirm Password
+                </label>
+                <div className="relative">
+                  <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type={showCf ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    placeholder="Re-enter your password"
+                    value={form.confirm}
+                    onChange={setField('confirm')}
+                    className={`${inp('confirm')} pr-11`}
+                  />
+                  <button type="button" tabIndex={-1} onClick={() => setShowCf(v => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    {showCf ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
+                {errors.confirm && (
+                  <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
+                    <AlertCircle size={11} />{errors.confirm}
+                  </p>
+                )}
+              </div>
+
+              {/* Terms */}
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                By creating an account you agree to our{' '}
+                <Link to="/terms" className="text-emerald-600 dark:text-emerald-400 hover:underline">Terms</Link>
+                {' '}and{' '}
+                <Link to="/privacy" className="text-emerald-600 dark:text-emerald-400 hover:underline">Privacy Policy</Link>.
+              </p>
+
+              {/* Submit */}
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60
+                           text-white font-semibold text-sm flex items-center justify-center gap-2 transition"
+              >
+                {isLoading ? (
+                  <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <>Create Account <ChevronRight size={15} /></>
+                )}
+              </button>
+            </form>
+
+            {/* Divider + OAuth */}
+            <div className="flex items-center gap-3 my-4">
+              <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+              <span className="text-xs text-gray-400">or sign up with</span>
+              <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+            </div>
+
+            <OAuthButtons
+              onSuccess={() => { showSuccessToast('Signed up!'); navigate('/dashboard') }}
+              onError={(msg) => showErrorToast(msg ?? 'OAuth signup failed')}
+            />
+
+            <p className="mt-5 text-center text-sm text-gray-500 dark:text-gray-400">
+              Already have an account?{' '}
+              <Link to="/login" className="text-emerald-600 dark:text-emerald-400 font-semibold hover:underline">
+                Sign in
+              </Link>
+            </p>
+          </div>
+
         </motion.div>
-      </div>
+      </main>
+
+      {/* ── Footer ──────────────────────────────────────────────────────── */}
+      <Footer />
     </div>
   )
 }

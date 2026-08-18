@@ -1,0 +1,62 @@
+# OpenTelemetry Collector — local dev / Docker Compose
+# Receives OTLP from the FastAPI backend and fans out to Jaeger (traces)
+# and a Prometheus scrape endpoint (metrics).
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 256
+    spike_limit_mib: 64
+
+  batch:
+    timeout: 5s
+    send_batch_size: 1024
+    send_batch_max_size: 2048
+
+exporters:
+  # Forward traces to Jaeger via OTLP
+  otlp/jaeger:
+    endpoint: jaeger:4317
+    tls:
+      insecure: true
+
+  # Expose aggregated OTLP metrics for Prometheus to scrape on :8889
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+    namespace: otelcol
+    resource_to_telemetry_conversion:
+      enabled: true
+
+  # Debug logging (set verbosity: detailed for deep inspection)
+  debug:
+    verbosity: normal
+
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp/jaeger]
+
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [prometheus]
+
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [debug]
