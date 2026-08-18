@@ -142,12 +142,11 @@ jobs:
         env:
           VITE_API_URL: "http://localhost:18000/api/v1"
 
-  # ── Docker: build images (only on push to main) ────────────────────────────
+  # ── Docker: build images (on every push and PR — verify images build) ───────
   docker-build:
     name: Docker — Build Images
     runs-on: ubuntu-latest
     needs: [backend-test, frontend-build]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
       - uses: actions/checkout@v4
