@@ -63,7 +63,7 @@ def sample_loan(user_id, loan_id):
         remaining_months=28,
         start_date=date(2023, 1, 1),
         next_due_date=date(2026, 2, 1),
-        status="Active",
+        status="active",
         description="Personal loan",
         created_at=datetime.now()
     )
@@ -142,7 +142,7 @@ class TestLoanService:
         # Mock the _loan_to_response to avoid schema conversion errors
         loan_service._loan_to_response = AsyncMock(return_value=MagicMock())
         
-        result = await loan_service.get_user_loans(user_id, status="Active")
+        result = await loan_service.get_user_loans(user_id, status="active")
         
         assert result is not None
     
@@ -283,7 +283,7 @@ class TestLoanServiceComprehensive:
             remaining_months=24,
             start_date=date(2023, 1, 1),
             next_due_date=date(2026, 2, 1),
-            status="Active",
+            status="active",
             created_at=datetime.now()
         )
         
@@ -318,7 +318,7 @@ class TestLoanServiceComprehensive:
             remaining_months=59,
             start_date=date(2023, 1, 1),
             next_due_date=date(2023, 2, 1),
-            status="Active",
+            status="active",
             created_at=datetime.now()
         )
         
@@ -382,7 +382,7 @@ class TestLoanServiceComprehensive:
             remaining_months=60,
             start_date=date(2024, 1, 1),
             next_due_date=date(2024, 2, 1),
-            status="Active",
+            status="active",
             created_at=datetime.now()
         )
         
@@ -412,7 +412,7 @@ class TestLoanServiceComprehensive:
             remaining_months=24,
             start_date=date(2023, 1, 1),
             next_due_date=date(2026, 2, 1),
-            status="Active",
+            status="active",
             created_at=datetime.now()
         )
         
@@ -429,7 +429,7 @@ class TestLoanServiceComprehensive:
             remaining_months=30,
             start_date=date(2022, 1, 1),
             next_due_date=date(2025, 7, 1),
-            status="Active",
+            status="active",
             created_at=datetime.now()
         )
         
@@ -458,7 +458,7 @@ class TestLoanServiceComprehensive:
             remaining_months=24,
             start_date=date(2023, 1, 1),
             next_due_date=date(2026, 2, 1),
-            status="Active",
+            status="active",
             created_at=datetime.now()
         )
         
@@ -487,7 +487,7 @@ class TestLoanServiceComprehensive:
             remaining_months=24,
             start_date=date(2023, 1, 1),
             next_due_date=date(2026, 2, 1),
-            status="Active",
+            status="active",
             created_at=datetime.now()
         )
         
@@ -504,7 +504,7 @@ class TestLoanServiceComprehensive:
             remaining_months=30,
             start_date=date(2022, 1, 1),
             next_due_date=date(2025, 7, 1),
-            status="Active",
+            status="active",
             created_at=datetime.now()
         )
         
@@ -533,7 +533,7 @@ class TestLoanServiceComprehensive:
             remaining_months=24,
             start_date=date(2023, 1, 1),
             next_due_date=date(2026, 2, 1),
-            status="Active",
+            status="active",
             created_at=datetime.now()
         )
         
@@ -569,7 +569,7 @@ class TestLoanServicePaymentScenarios:
             remaining_months=1,
             start_date=date(2023, 1, 1),
             next_due_date=date(2023, 2, 1),
-            status="Active",
+            status="active",
             created_at=datetime.now()
         )
         
@@ -644,7 +644,7 @@ class TestLoanServicePaymentScenarios:
             remaining_months=60,
             start_date=date(2023, 1, 1),
             next_due_date=date(2023, 2, 1),
-            status="Active",
+            status="active",
             created_at=datetime.now()
         )
         
@@ -684,7 +684,7 @@ class TestLoanServicePaymentScenarios:
             remaining_months=59,
             start_date=date(2023, 1, 1),
             next_due_date=date(2023, 2, 1),
-            status="Active",
+            status="active",
             created_at=datetime.now()
         )
         
@@ -896,7 +896,7 @@ class TestLoanServiceAnalytics:
             remaining_months=24,
             start_date=date(2024, 1, 1),
             next_due_date=date(2024, 2, 1),
-            status="Active",
+            status="active",
             created_at=datetime.now()
         )
         
@@ -975,7 +975,7 @@ class TestLoanServiceCalculations:
             remaining_months=4,
             start_date=date(2026, 1, 1),
             next_due_date=date(2026, 2, 1),
-            status="Active",
+            status="active",
             created_at=datetime.now()
         )
         
@@ -1007,7 +1007,7 @@ class TestLoanServiceCalculations:
             remaining_months=20,
             start_date=date(2024, 1, 1),
             next_due_date=date(2026, 2, 1),
-            status="Active",
+            status="active",
             created_at=datetime.now()
         )
         

@@ -152,22 +152,22 @@ class TestLoginEndpoint:
 class TestMeEndpoint:
     """Test get current user endpoint."""
     
-    def test_get_me_without_token(self, client):
+    def test_get_me_without_token(self, unauth_client):
         """Test /me endpoint without authentication token."""
-        response = client.get("/api/v1/auth/me")
+        response = unauth_client.get("/api/v1/auth/me")
         assert response.status_code == 401
-    
-    def test_get_me_invalid_token_format(self, client):
+
+    def test_get_me_invalid_token_format(self, unauth_client):
         """Test /me endpoint with invalid token format."""
-        response = client.get(
+        response = unauth_client.get(
             "/api/v1/auth/me",
             headers={"Authorization": "InvalidFormat"}
         )
         assert response.status_code in [401, 403]
-    
-    def test_get_me_missing_bearer_prefix(self, client):
+
+    def test_get_me_missing_bearer_prefix(self, unauth_client):
         """Test /me endpoint without Bearer prefix."""
-        response = client.get(
+        response = unauth_client.get(
             "/api/v1/auth/me",
             headers={"Authorization": "sometoken"}
         )
@@ -268,14 +268,14 @@ class TestAuthEdgeCases:
         assert put_response.status_code == 405
         assert delete_response.status_code == 405
     
-    def test_me_method_validation(self, client):
+    def test_me_method_validation(self, unauth_client):
         """Test /me endpoint only accepts GET."""
-        get_response = client.get("/api/v1/auth/me")
-        post_response = client.post("/api/v1/auth/me")
-        put_response = client.put("/api/v1/auth/me", json={})
-        delete_response = client.delete("/api/v1/auth/me")
-        
-        assert get_response.status_code in [401, 403]  # GET allowed but auth error
+        get_response = unauth_client.get("/api/v1/auth/me")
+        post_response = unauth_client.post("/api/v1/auth/me")
+        put_response = unauth_client.put("/api/v1/auth/me", json={})
+        delete_response = unauth_client.delete("/api/v1/auth/me")
+
+        assert get_response.status_code in [401, 403]  # no auth → 401
         assert post_response.status_code == 405
         assert put_response.status_code == 405
         assert delete_response.status_code == 405

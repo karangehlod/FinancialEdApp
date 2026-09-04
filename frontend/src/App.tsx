@@ -11,11 +11,12 @@
  *   - Theme initialization
  */
 
-import { useEffect, Suspense, lazy } from 'react'
+import { useEffect, useCallback, Suspense, lazy } from 'react'
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { useInitAuth } from '@/hooks/useAuth'
 import { useThemeStore } from '@/store/themeStore'
+import { useAuthStore } from '@/store/authStore'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { SessionWarning } from '@/components/SessionWarning'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
@@ -168,6 +169,14 @@ export default function App(): JSX.Element {
   useEffect(() => {
     initTheme()
   }, [initTheme])
+
+  // Listen for session-expired events from the API interceptor (FE-07: replaces window.location.href)
+  const logout = useAuthStore((s) => s.logout)
+  const handleSessionExpired = useCallback(() => { logout() }, [logout])
+  useEffect(() => {
+    window.addEventListener('auth:session-expired', handleSessionExpired)
+    return () => window.removeEventListener('auth:session-expired', handleSessionExpired)
+  }, [handleSessionExpired])
 
   return (
     <ErrorBoundary>

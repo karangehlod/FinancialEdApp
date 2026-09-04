@@ -78,7 +78,7 @@ class LoanRepository(ILoanRepository):
                 and_(Loan.id == loan_id, Loan.user_id == user_id)
             )
         )
-        return result.scalars().first()
+        return result.scalar_one_or_none()
 
     async def get_loans_by_user(
         self,
@@ -112,7 +112,7 @@ class LoanRepository(ILoanRepository):
         for field, value in update_fields.items():
             setattr(loan, field, value)
 
-        loan.updated_at = datetime.now(timezone.utc)
+        loan.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         await self._db.flush()
         await self._db.refresh(loan)
         logger.debug("LoanRepository.update_loan: updated loan %s", loan_id)

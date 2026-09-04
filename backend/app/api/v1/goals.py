@@ -22,6 +22,11 @@ logger = get_logger(__name__)
 
 router = APIRouter(prefix="/goals", tags=["Goals"])
 
+def get_goal_service(db: AsyncSession = Depends(get_data_db)) -> GoalService:
+    """FastAPI dependency — factory for GoalService."""
+    return GoalService(db)
+
+
 
 @router.post("", response_model=GoalResponse, status_code=status.HTTP_201_CREATED)
 async def create_goal(
@@ -47,7 +52,7 @@ async def create_goal(
     - 401: Unauthorized
     - 500: Server error
     """
-    service = GoalService(db)
+    service = get_goal_service(db)
     goal = await service.create_goal(current_user.id, goal_data)
     
     return GoalResponse(
@@ -84,7 +89,7 @@ async def get_goals(
     
     **Response:** List of goals with progress information
     """
-    service = GoalService(db)
+    service = get_goal_service(db)
     goals = await service.get_user_goals(current_user.id, status=status_filter, goal_type=goal_type)
     
     from datetime import date
@@ -132,7 +137,7 @@ async def get_goal(
     - 404: Goal not found
     - 401: Unauthorized
     """
-    service = GoalService(db)
+    service = get_goal_service(db)
     goal = await service.get_goal(goal_id, current_user.id)
     
     from datetime import date
@@ -171,7 +176,7 @@ async def update_goal(
     
     **Response:** Updated goal
     """
-    service = GoalService(db)
+    service = get_goal_service(db)
     goal = await service.update_goal(goal_id, current_user.id, goal_data)
     
     from datetime import date
@@ -207,7 +212,7 @@ async def delete_goal(
     
     **Response:** 204 No Content on success
     """
-    service = GoalService(db)
+    service = get_goal_service(db)
     await service.delete_goal(goal_id, current_user.id)
     return None
 
@@ -237,7 +242,7 @@ async def update_goal_progress(
     }
     ```
     """
-    service = GoalService(db)
+    service = get_goal_service(db)
     goal = await service.update_goal_progress(
         goal_id, current_user.id, progress_data.current_amount
     )
@@ -282,7 +287,7 @@ async def get_goal_progress(
     - **required_monthly_savings**: Monthly savings needed to meet goal
     - **on_track**: Whether goal is on track
     """
-    service = GoalService(db)
+    service = get_goal_service(db)
     progress = await service.get_goal_progress(goal_id, current_user.id)
     return progress
 
@@ -302,6 +307,6 @@ async def get_goals_summary(
     - **overall_progress_percentage**: Overall progress (0-100)
     - **goals_by_type**: Breakdown by goal type
     """
-    service = GoalService(db)
+    service = get_goal_service(db)
     summary = await service.get_goals_summary(current_user.id)
     return summary

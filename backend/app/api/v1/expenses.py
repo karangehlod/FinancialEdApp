@@ -27,6 +27,11 @@ logger = get_logger(__name__)
 
 router = APIRouter(prefix="/expenses", tags=["Expenses"])
 
+def get_expense_service(db: AsyncSession = Depends(get_data_db)) -> ExpenseService:
+    """FastAPI dependency — factory for ExpenseService."""
+    return ExpenseService(db)
+
+
 
 @router.post("", response_model=ExpenseResponse, status_code=status.HTTP_201_CREATED)
 async def create_expense(
@@ -42,7 +47,7 @@ async def create_expense(
     - **date**: Date of expense
     - **description**: Optional description
     """
-    service = ExpenseService(db)
+    service = get_expense_service(db)
     expense = await service.create_expense(current_user.id, expense_data)
     return expense
 
@@ -57,7 +62,7 @@ async def get_expense_summary(
     db: AsyncSession = Depends(get_data_db)
 ):
     """Get summary of expenses for the authenticated user."""
-    service = ExpenseService(db)
+    service = get_expense_service(db)
     summary = await service.get_expense_summary(
         current_user.id, start_date=start_date, end_date=end_date
     )
@@ -208,7 +213,7 @@ async def list_expenses(
         payment_method=payment_method
     )
     
-    service = ExpenseService(db)
+    service = get_expense_service(db)
     expenses, total = await service.get_user_expenses(
         current_user.id, skip, limit, filters
     )
@@ -236,7 +241,7 @@ async def get_expense(
         "Get expense request",
         extra={"expense_id": str(expense_id), "user_id": str(current_user.id)}
     )
-    service = ExpenseService(db)
+    service = get_expense_service(db)
     expense = await service.get_expense(expense_id, current_user.id)
     return expense
 
@@ -266,7 +271,7 @@ async def update_expense(
             "Update expense request",
             extra={"expense_id": str(expense_id), "user_id": str(current_user.id), "data": str(expense_data)}
         )
-        service = ExpenseService(db)
+        service = get_expense_service(db)
         expense = await service.update_expense(
             expense_id, current_user.id, expense_data
         )
@@ -299,7 +304,7 @@ async def delete_expense(
         "Delete expense request",
         extra={"expense_id": str(expense_id), "user_id": str(current_user.id)}
     )
-    service = ExpenseService(db)
+    service = get_expense_service(db)
     success = await service.delete_expense(expense_id, current_user.id)
     return None
 

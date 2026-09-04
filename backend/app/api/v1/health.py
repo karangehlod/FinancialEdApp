@@ -4,7 +4,7 @@ from typing import Dict, Any, Optional
 from enum import Enum
 import logging
 import inspect
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, status
 from fastapi.responses import JSONResponse
@@ -86,7 +86,7 @@ async def liveness_probe():
     """
     return {
         "status": HealthStatus.HEALTHY,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "message": "Application is running"
     }
 
@@ -117,7 +117,7 @@ async def readiness_probe():
             status_code=status_code,
             content={
                 "status": overall_status,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "dependencies": dependency_results
             }
         )
@@ -127,7 +127,7 @@ async def readiness_probe():
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content={
                 "status": HealthStatus.UNHEALTHY,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "error": str(e)
             }
         )
@@ -162,7 +162,7 @@ async def detailed_health():
         
         return {
             "status": overall_status,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "checks": checks,
             "dependencies": dependencies,
             "uptime_seconds": None  # Can be populated with actual uptime
@@ -173,7 +173,7 @@ async def detailed_health():
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content={
                 "status": HealthStatus.UNHEALTHY,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "error": str(e)
             }
         )
@@ -229,7 +229,7 @@ async def auth_db_health():
             
         return {
             "status": HealthStatus.HEALTHY,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "database": "auth_db",
             "message": "Auth database is healthy and accessible"
         }
@@ -239,7 +239,7 @@ async def auth_db_health():
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content={
                 "status": HealthStatus.UNHEALTHY,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "database": "auth_db",
                 "error": str(e)
             }
@@ -262,7 +262,7 @@ async def data_db_health():
             
         return {
             "status": HealthStatus.HEALTHY,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "database": "financial_ed_db",
             "message": "Data database is healthy and accessible"
         }
@@ -272,7 +272,7 @@ async def data_db_health():
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content={
                 "status": HealthStatus.UNHEALTHY,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "database": "financial_ed_db",
                 "error": str(e)
             }
@@ -320,7 +320,7 @@ async def databases_health():
         status_code=status_code,
         content={
             "status": HealthStatus.HEALTHY if all_healthy else HealthStatus.UNHEALTHY,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "databases": {
                 "auth_db": {
                     "status": auth_db_status,

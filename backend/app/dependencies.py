@@ -26,19 +26,24 @@ logger = logging.getLogger(__name__)
 # HTTP Bearer token scheme
 security = HTTPBearer(auto_error=False)
 
-# ---------------------------------------------------------------------------
-# Legacy global for backward compatibility (set during startup)
-# ---------------------------------------------------------------------------
+# Module-level cache reference — used as fallback when no Request is available
+# (e.g. direct calls in unit tests).  Production code uses app.state.redis_cache
+# via the request-based path below.
 _redis_cache: Optional[RedisCache] = None
 
 
 def get_redis_cache() -> Optional[RedisCache]:
-    """Return the global Redis cache instance (may be None if Redis is down)."""
+    """Return the current Redis cache instance (None if Redis is unavailable).
+
+    Can be called directly (tests) or used as FastAPI Depends() — no Request
+    parameter needed because the cache is stored as a module-level global that
+    lifespan startup sets via set_redis_cache().
+    """
     return _redis_cache
 
 
 async def set_redis_cache(cache: Optional[RedisCache]) -> None:
-    """Store the Redis cache instance (called from lifespan startup)."""
+    """Store a Redis cache instance — called from lifespan startup and tests."""
     global _redis_cache
     _redis_cache = cache
 

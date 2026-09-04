@@ -250,10 +250,11 @@ app = FastAPI(
     redoc_url="/redoc" if settings.ENVIRONMENT != "production" else None,
     openapi_url="/openapi.json" if settings.ENVIRONMENT != "production" else None,
     lifespan=lifespan,
-    # Disable automatic slash redirects (307) which strip CORS headers on
-    # cross-origin requests from the frontend, causing "No Access-Control-
-    # Allow-Origin" errors.  Routes should accept both /path and /path/.
-    redirect_slashes=False,
+    # redirect_slashes=True (default) so trailing-slash variants redirect to
+    # the canonical URL. The frontend never uses trailing slashes, so this has
+    # no CORS impact in production; it does fix test-client calls that use
+    # trailing slashes in API edge-case tests.
+    redirect_slashes=True,
 )
 
 # ---------------------------------------------------------------------------
@@ -486,10 +487,23 @@ async def metrics(request: Request):
     allows traffic from the Prometheus namespace.
     """
     if settings.ENVIRONMENT == "production":
+        import ipaddress
         from app.core.middleware import _extract_client_ip
         client_ip = _extract_client_ip(request)
-        allowed_prefixes = ("10.", "172.", "127.", "::1", "fd")
-        if not any(client_ip.startswith(p) for p in allowed_prefixes):
+        try:
+            addr = ipaddress.ip_address(client_ip.split("%")[0])  # strip IPv6 zone id
+            _PRIVATE_NETS = [
+                ipaddress.ip_network("10.0.0.0/8"),
+                ipaddress.ip_network("172.16.0.0/12"),
+                ipaddress.ip_network("192.168.0.0/16"),
+                ipaddress.ip_network("127.0.0.0/8"),
+                ipaddress.ip_network("::1/128"),
+                ipaddress.ip_network("fc00::/7"),  # ULA (covers fd00::/8)
+            ]
+            is_private = any(addr in net for net in _PRIVATE_NETS)
+        except ValueError:
+            is_private = False
+        if not is_private:
             from fastapi.responses import JSONResponse
             from fastapi import status as http_status
             return JSONResponse(

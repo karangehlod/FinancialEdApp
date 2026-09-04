@@ -1,0 +1,28 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+  external_labels:
+    environment: local
+    app: financialedapp
+
+scrape_configs:
+  # FastAPI backend — custom Prometheus metrics at /metrics
+  - job_name: financialedapp-backend
+    static_configs:
+      - targets: ['backend:8000']
+    metrics_path: /metrics
+    scrape_interval: 15s
+
+  # OTel Collector self-metrics (pipeline throughput, drop rates, etc.)
+  - job_name: otel-collector
+    static_configs:
+      - targets: ['otelcol:8889']
+    metrics_path: /metrics
+    scrape_interval: 30s
+
+  # Prometheus itself
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 60s

@@ -1,5 +1,5 @@
-# Build stage
-FROM node:18-alpine AS builder
+# Stage 1: Build
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -7,49 +7,31 @@ WORKDIR /app
 ARG VITE_API_URL
 ARG VITE_APP_NAME
 ARG VITE_APP_VERSION
-ARG VITE_ADMIN_EMAILS
 
-ENV VITE_API_URL=$VITE_API_URL
-ENV VITE_APP_NAME=$VITE_APP_NAME
-ENV VITE_APP_VERSION=$VITE_APP_VERSION
-ENV VITE_ADMIN_EMAILS=$VITE_ADMIN_EMAILS
+ENV VITE_API_URL=$VITE_API_URL \
+    VITE_APP_NAME=$VITE_APP_NAME \
+    VITE_APP_VERSION=$VITE_APP_VERSION
 
-# Copy package files
 COPY package*.json ./
+RUN npm install --legacy-peer-deps
 
-# Install dependencies
-RUN npm ci
-
-# Copy source code
 COPY . .
-
-# Build the React app
 RUN npm run build
 
-# Production/Development stage
-FROM node:18-alpine
+# Stage 2: Serve with nginx (no Node.js runtime needed — just static files)
+FROM nginx:alpine AS runtime
 
-WORKDIR /app
+RUN apk add --no-cache curl
 
-# Install serve to run the production build and wget for healthcheck
-RUN npm install -g serve
+# Copy the built app
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copy built app from builder
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/package*.json ./
+# SPA routing config
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Install production dependencies only
-RUN npm ci --production
+EXPOSE 80
 
-# Expose port
-EXPOSE 3000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD curl -sf http://localhost/healthz || exit 1
 
-# Set environment to production
-ENV NODE_ENV=production
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD wget --quiet --tries=1 --spider http://localhost:3000 || exit 1
-
-# Start the app
-CMD ["serve", "-s", "dist", "-l", "3000"]
+CMD ["nginx", "-g", "daemon off;"]

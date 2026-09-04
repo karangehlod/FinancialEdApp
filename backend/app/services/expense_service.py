@@ -19,11 +19,12 @@ from app.core.exceptions import (
 )
 from app.core.logging import get_logger
 from app.repositories.expense_repository import ExpenseRepository
+from app.services.base_service import BaseService
 
 logger = get_logger(__name__)
 
 
-class ExpenseService:
+class ExpenseService(BaseService):
     """
     Service for expense CRUD and business logic operations.
 
@@ -45,6 +46,7 @@ class ExpenseService:
             db:            Async SQLAlchemy session.
             cache_service: Optional CacheService for Redis invalidation.
         """
+        super().__init__()
         self.db = db
         self.repository = ExpenseRepository(db)
         self._cache = cache_service  # May be None or NullCacheService
@@ -70,8 +72,17 @@ class ExpenseService:
 
         try:
             new_expense = await self.repository.create(user_id, expense_data)
-            await self._update_related_budget_spending(new_expense)
-            # Commit the budget update (expense already committed by repository)
+
+            # Savepoint: budget recalculation is non-critical.
+            # If it fails, we roll back only the budget update, not the expense insert.
+            try:
+                async with self.db.begin_nested():
+                    await self._update_related_budget_spending(new_expense)
+            except Exception as budget_exc:
+                logger.warning(
+                    f"Budget recalculation failed (expense still saved): {budget_exc}"
+                )
+
             await self.db.commit()
         except (InvalidExpenseAmountError, InvalidExpenseDateError):
             raise

@@ -173,3 +173,26 @@ async def dispose_engines() -> None:
     await auth_engine.dispose()
     await data_engine.dispose()
     logger.info("Database connection pools disposed.")
+
+
+def get_pool_strategy_summary() -> dict:
+    """Return a summary of the current connection pool configuration for both databases."""
+    summary = {}
+    for name, engine in (("auth_db", auth_engine), ("data_db", data_engine)):
+        try:
+            pool = engine.pool
+            summary[name] = {
+                "pool_class": pool.__class__.__name__,
+                "pool_size": getattr(pool, "size", lambda: "unknown")()
+                             if callable(getattr(pool, "size", None))
+                             else getattr(pool, "_pool_size", "unknown"),
+                "checked_in": getattr(pool, "checkedin", lambda: "unknown")()
+                              if callable(getattr(pool, "checkedin", None))
+                              else "unknown",
+                "overflow": getattr(pool, "overflow", lambda: "unknown")()
+                            if callable(getattr(pool, "overflow", None))
+                            else "unknown",
+            }
+        except Exception as exc:
+            summary[name] = {"pool_class": "unknown", "error": str(exc)}
+    return summary

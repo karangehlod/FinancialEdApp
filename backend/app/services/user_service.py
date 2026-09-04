@@ -13,7 +13,7 @@ from app.services.base_service import CRUDService
 logger = logging.getLogger(__name__)
 
 
-class UserService(CRUDService[UserProfile]):
+class UserService(CRUDService):
     """
     User service with full dependency injection.
     

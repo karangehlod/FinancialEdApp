@@ -18,7 +18,7 @@ Security:
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -26,8 +26,8 @@ from pydantic import BaseModel
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.session import get_auth_db, get_data_db
 from app.db.models.auth import User
+from app.db.session import get_auth_db, get_data_db
 from app.dependencies import get_current_user
 
 logger = logging.getLogger(__name__)
@@ -40,7 +40,7 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 # ---------------------------------------------------------------------------
 
 async def require_admin(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),  # noqa: B008
 ) -> User:
     """
     Dependency that ensures the authenticated user has admin privileges.
@@ -78,12 +78,12 @@ class UserSummary(BaseModel):
     is_active: bool
     is_verified: bool
     totp_enabled: bool
-    last_login: Optional[datetime]
-    created_at: Optional[datetime]
+    last_login: datetime | None
+    created_at: datetime | None
 
 
 class UserListResponse(BaseModel):
-    users: List[UserSummary]
+    users: list[UserSummary]
     total: int
     page: int
     per_page: int
@@ -111,8 +111,8 @@ class AuditLogEntry(BaseModel):
     table_name: str
     record_id: str
     deleted_by: str
-    reason: Optional[str]
-    created_at: Optional[datetime]
+    reason: str | None
+    created_at: datetime | None
 
 
 # ---------------------------------------------------------------------------
@@ -128,7 +128,7 @@ async def list_users(
     request: Request,
     page: int = Query(1, ge=1, description="Page number"),
     per_page: int = Query(50, ge=1, le=200, description="Results per page"),
-    search: Optional[str] = Query(None, description="Filter by email (partial match)"),
+    search: str | None = Query(None, description="Filter by email (partial match)"),
     active_only: bool = Query(False, description="Only show active users"),
     admin: User = Depends(require_admin),
     auth_db: AsyncSession = Depends(get_auth_db),
@@ -145,7 +145,7 @@ async def list_users(
     if search:
         query = query.where(UserModel.email.ilike(f"%{search}%"))
     if active_only:
-        query = query.where(UserModel.is_active == True)
+        query = query.where(UserModel.is_active.is_(True))
 
     # Total count
     count_q = select(func.count()).select_from(query.subquery())
@@ -318,7 +318,7 @@ async def platform_metrics(
 
 @router.get(
     "/audit-log",
-    response_model=List[AuditLogEntry],
+    response_model=list[AuditLogEntry],
     summary="Recent system audit log entries",
 )
 async def audit_log(
@@ -357,7 +357,7 @@ async def admin_health(
 
     Returns status of: Auth DB, Data DB, Redis, background worker.
     """
-    checks: Dict[str, Any] = {}
+    checks: dict[str, Any] = {}
 
     # Auth DB
     try:

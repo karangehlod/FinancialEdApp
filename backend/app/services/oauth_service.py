@@ -26,18 +26,15 @@ P2-6: OAuth / Social Login
 
 import hashlib
 import logging
-import os
 import secrets
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional, Tuple
-from uuid import UUID, uuid4
-
+from uuid import UUID
 import httpx
 from cryptography.fernet import Fernet
 
 from app.config import settings
 from app.core.exceptions import AuthenticationError
-from app.db.models.auth import OAuthAccount, User
+from app.db.models.auth import User
 from app.repositories.oauth_account_repository import OAuthAccountRepository
 from app.repositories.refresh_token_repository import RefreshTokenRepository
 from app.repositories.user_repository import UserRepository
@@ -93,7 +90,7 @@ def _decrypt(value: str) -> str:
     return _get_fernet().decrypt(value.encode()).decode()
 
 
-def _build_token_response(access_token: str, refresh_token: str, user: User) -> Dict:
+def _build_token_response(access_token: str, refresh_token: str, user: User) -> dict:
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
@@ -220,8 +217,8 @@ class OAuthService(BaseService):
         code: str,
         redirect_uri: str,
         state: str,
-        device_info: Optional[str] = None,
-    ) -> Dict:
+        device_info: str | None = None,
+    ) -> dict:
         """
         Exchange Google authorization code for tokens, verify the ID token,
         and return app JWT tokens.
@@ -259,7 +256,7 @@ class OAuthService(BaseService):
         )
         return await self._issue_app_tokens(user, device_info)
 
-    async def _exchange_google_code(self, code: str, redirect_uri: str) -> Dict:
+    async def _exchange_google_code(self, code: str, redirect_uri: str) -> dict:
         """POST to Google's token endpoint to exchange the authorization code."""
         payload = {
             "code": code,
@@ -275,7 +272,7 @@ class OAuthService(BaseService):
             raise AuthenticationError("Google authentication failed")
         return resp.json()
 
-    async def _verify_google_id_token(self, id_token: str) -> Dict:
+    async def _verify_google_id_token(self, id_token: str) -> dict:
         """
         Verify a Google ID token using Google's public JWKs.
 
@@ -307,11 +304,11 @@ class OAuthService(BaseService):
     async def handle_apple_callback(
         self,
         code: str,
-        id_token: Optional[str],
+        id_token: str | None,
         state: str,
-        user_json: Optional[str] = None,
-        device_info: Optional[str] = None,
-    ) -> Dict:
+        user_json: str | None = None,
+        device_info: str | None = None,
+    ) -> dict:
         """
         Handle Apple Sign-in callback.
 
@@ -336,7 +333,7 @@ class OAuthService(BaseService):
         email = profile.get("email")
 
         # Apple only sends name on first sign-in (in the user JSON form field)
-        display_name: Optional[str] = None
+        display_name: str | None = None
         if user_json:
             import json
             try:
@@ -361,7 +358,7 @@ class OAuthService(BaseService):
         )
         return await self._issue_app_tokens(user, device_info)
 
-    async def _exchange_apple_code(self, code: str) -> Dict:
+    async def _exchange_apple_code(self, code: str) -> dict:
         """Exchange Apple authorization code using a signed client_secret JWT."""
         client_secret = self._build_apple_client_secret()
         payload = {
@@ -386,7 +383,7 @@ class OAuthService(BaseService):
         """
         import jwt as pyjwt
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         payload = {
             "iss": settings.APPLE_TEAM_ID,
             "iat": now,
@@ -402,7 +399,7 @@ class OAuthService(BaseService):
             headers={"kid": settings.APPLE_KEY_ID},
         )
 
-    async def _verify_apple_id_token(self, id_token: str) -> Dict:
+    async def _verify_apple_id_token(self, id_token: str) -> dict:
         """
         Verify an Apple ID token against Apple's public JWKs (RS256).
 
@@ -435,12 +432,12 @@ class OAuthService(BaseService):
         self,
         provider: str,
         provider_uid: str,
-        email: Optional[str],
-        display_name: Optional[str] = None,
-        avatar_url: Optional[str] = None,
-        access_token: Optional[str] = None,
-        refresh_token: Optional[str] = None,
-        token_expires_in: Optional[int] = None,
+        email: str | None,
+        display_name: str | None = None,
+        avatar_url: str | None = None,
+        access_token: str | None = None,
+        refresh_token: str | None = None,
+        token_expires_in: int | None = None,
     ) -> User:
         """
         Core account-lookup/creation logic:
@@ -454,9 +451,9 @@ class OAuthService(BaseService):
         # Encrypt provider tokens before storage
         enc_access = _encrypt(access_token) if access_token else None
         enc_refresh = _encrypt(refresh_token) if refresh_token else None
-        expires_at: Optional[datetime] = None
+        expires_at: datetime | None = None
         if token_expires_in:
-            expires_at = datetime.utcnow() + timedelta(seconds=token_expires_in)
+            expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(seconds=token_expires_in)
 
         # 1. Existing OAuth link
         existing_oauth = await self.oauth_repo.get_by_provider(provider, provider_uid)
@@ -475,7 +472,7 @@ class OAuthService(BaseService):
             return user
 
         # 2. Email-based link to existing local account
-        user: Optional[User] = None
+        user: User | None = None
         if email:
             user = await self.user_repo.get_user_by_email(email)
 
@@ -525,8 +522,8 @@ class OAuthService(BaseService):
     async def _issue_app_tokens(
         self,
         user: User,
-        device_info: Optional[str] = None,
-    ) -> Dict:
+        device_info: str | None = None,
+    ) -> dict:
         """
         Issue application-level JWT access + refresh tokens for the given user
         and persist the refresh token hash in the DB.
@@ -540,7 +537,7 @@ class OAuthService(BaseService):
             data={"sub": str(user.id), "type": "refresh"},
         )
         token_hash = _sha256(refresh_token)
-        expires_at = datetime.utcnow() + timedelta(seconds=_REFRESH_TOKEN_TTL_SECONDS)
+        expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(seconds=_REFRESH_TOKEN_TTL_SECONDS)
         await self.refresh_token_repo.create(
             user_id=user.id,
             token_hash=token_hash,

@@ -29,8 +29,6 @@ class TestSoftDeleteMixin:
             amount=100.00,
             category="food",
             date=date.today(),
-            is_deleted=False,
-            deleted_at=None,
         )
         
         expense.soft_delete()
@@ -46,7 +44,6 @@ class TestSoftDeleteMixin:
             amount=100.00,
             category="food",
             date=date.today(),
-            is_deleted=True,
             deleted_at=datetime.utcnow(),
         )
         
@@ -232,13 +229,13 @@ class TestSoftDeleteAuditTrail:
             date=date.today(),
         )
         
-        before_delete = datetime.now(timezone.utc)
+        before_delete = datetime.utcnow()  # naive, matches stored deleted_at
         expense.soft_delete()
-        after_delete = datetime.now(timezone.utc)
-        
+        after_delete = datetime.utcnow()   # naive
+
         assert expense.deleted_at is not None
-        # deleted_at should be a real Python datetime (not a SQLAlchemy function)
         assert isinstance(expense.deleted_at, datetime)
+        # Compare as naive datetimes
         assert before_delete <= expense.deleted_at <= after_delete
 
     def test_restore_clears_deletion_timestamp(self):
